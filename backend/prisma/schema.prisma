@@ -1,0 +1,122 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  ADMIN
+  USER
+}
+
+enum FilterOperator {
+  EQUALS
+}
+
+model User {
+  id            Int                @id @default(autoincrement())
+  username      String             @unique
+  displayName   String
+  profileLabel  String?
+  passwordHash  String
+  role          UserRole           @default(USER)
+  active        Boolean            @default(true)
+  reportAccess  UserReportAccess[]
+  filterRules   FilterRule[]
+  auditLogs     AuditLog[]
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+}
+
+model Report {
+  id               Int                 @id @default(autoincrement())
+  name             String
+  description      String?
+  workspaceId      String?
+  reportKey        String?
+  datasetId        String?
+  embedUrl         String?
+  categoryId       Int?
+  active           Boolean             @default(true)
+  category         ReportCategory?     @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  accesses         UserReportAccess[]
+  filterRules      FilterRule[]
+  filterableFields ReportFilterField[]
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+}
+
+model ReportCategory {
+  id        Int      @id @default(autoincrement())
+  name      String   @unique
+  color     String   @default("#ff7b2c")
+  sortOrder Int      @default(0)
+  reports   Report[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model ReportFilterField {
+  id         Int      @id @default(autoincrement())
+  reportId   Int
+  tableName  String
+  columnName String
+  report     Report   @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([reportId, tableName, columnName])
+  @@index([reportId])
+}
+
+model UserReportAccess {
+  userId        Int
+  reportId      Int
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  report        Report   @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  createdAt     DateTime @default(now())
+
+  @@id([userId, reportId])
+  @@index([reportId])
+}
+
+model FilterRule {
+  id            Int            @id @default(autoincrement())
+  userId        Int
+  reportId      Int?
+  tableName     String
+  columnName    String
+  operator      FilterOperator @default(EQUALS)
+  value         String
+  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  report        Report?        @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  @@index([userId])
+  @@index([reportId])
+}
+
+model AuditLog {
+  id               Int       @id @default(autoincrement())
+  actorUserId      Int?
+  actorUsername    String?
+  actorDisplayName String?
+  actorRole        UserRole?
+  action           String
+  entityType       String
+  entityId         String?
+  summary          String
+  before           Json?
+  after            Json?
+  metadata         Json?
+  actorUser        User?     @relation(fields: [actorUserId], references: [id], onDelete: SetNull)
+  createdAt        DateTime  @default(now())
+
+  @@index([actorUserId])
+  @@index([entityType, entityId])
+  @@index([createdAt])
+}
