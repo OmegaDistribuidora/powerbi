@@ -146,7 +146,7 @@ export async function registerReportRoutes(app: FastifyInstance): Promise<void> 
     }
 
     const authUser = request.authUser;
-    const report = await prisma.$transaction(async (tx) => {
+    const report = await prisma.$transaction(async (tx: any) => {
       const createdReport = await tx.report.create({
         data: {
           name: parsed.data.name.trim(),
@@ -218,7 +218,7 @@ export async function registerReportRoutes(app: FastifyInstance): Promise<void> 
 
     const authUser = request.authUser;
     const beforeSnapshot = reportAuditSnapshot(serializeReport(current));
-    const report = await prisma.$transaction(async (tx) => {
+    const report = await prisma.$transaction(async (tx: any) => {
       const updatedReport = await tx.report.update({
         where: { id: reportId },
         data: {
@@ -324,7 +324,7 @@ export async function registerReportRoutes(app: FastifyInstance): Promise<void> 
       after: {
         reportId,
         reportName: report.name,
-        filters: filterRules.map((rule) => ({
+        filters: filterRules.map((rule: (typeof filterRules)[number]) => ({
           id: rule.id,
           reportId: rule.reportId,
           tableName: rule.tableName,

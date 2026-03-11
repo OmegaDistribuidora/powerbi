@@ -58,7 +58,7 @@ export async function registerReportCategoryRoutes(app: FastifyInstance): Promis
     }
 
     const authUser = request.authUser;
-    const category = await prisma.$transaction(async (tx) => {
+    const category = await prisma.$transaction(async (tx: any) => {
       const created = await (tx as any).reportCategory.create({
         data: {
           name: parsed.data.name.trim(),
@@ -124,7 +124,7 @@ export async function registerReportCategoryRoutes(app: FastifyInstance): Promis
 
     const authUser = request.authUser;
     const before = serializeCategory(current);
-    const category = await prisma.$transaction(async (tx) => {
+    const category = await prisma.$transaction(async (tx: any) => {
       const updated = await (tx as any).reportCategory.update({
         where: { id: categoryId },
         data: {

@@ -1,8 +1,11 @@
-import { Prisma, PrismaClient } from "@prisma/client";
 import prisma from "./prisma";
 import type { AppUserRole, AuthUser } from "../types";
 
-type AuditPrismaClient = PrismaClient | Prisma.TransactionClient;
+type AuditPrismaClient = {
+  auditLog: {
+    create(args: { data: Record<string, unknown> }): Promise<unknown>;
+  };
+};
 
 type AuditSnapshotUser = {
   id: number;
@@ -18,9 +21,9 @@ type AuditEvent = {
   entityType: string;
   entityId?: string | number | null;
   summary: string;
-  before?: Prisma.InputJsonValue | null;
-  after?: Prisma.InputJsonValue | null;
-  metadata?: Prisma.InputJsonValue | null;
+  before?: unknown;
+  after?: unknown;
+  metadata?: unknown;
 };
 
 export function buildActorSnapshot({
@@ -38,8 +41,8 @@ export function buildActorSnapshot({
   };
 }
 
-function normalizeJson(value: Prisma.InputJsonValue | null) {
-  return value === null ? Prisma.JsonNull : value;
+function normalizeJson(value: unknown): unknown {
+  return value ?? null;
 }
 
 export async function recordAudit(event: AuditEvent, client: AuditPrismaClient = prisma): Promise<void> {
@@ -48,7 +51,7 @@ export async function recordAudit(event: AuditEvent, client: AuditPrismaClient =
     actorUser: event.actorUser
   });
 
-  const data: Prisma.AuditLogUncheckedCreateInput = {
+  const data: Record<string, unknown> = {
     action: event.action,
     entityType: event.entityType,
     summary: event.summary,

@@ -174,7 +174,7 @@ export async function registerUserRoutes(app: FastifyInstance): Promise<void> {
     }
 
     const authUser = request.authUser;
-    const created = await prisma.$transaction(async (tx) => {
+    const created = await prisma.$transaction(async (tx: any) => {
       const user = await tx.user.create({
         data: {
           username,
@@ -272,7 +272,7 @@ export async function registerUserRoutes(app: FastifyInstance): Promise<void> {
     const authUser = request.authUser;
     const beforeSnapshot = userAuditSnapshot(serializeUser(current));
 
-    const updated = await prisma.$transaction(async (tx) => {
+    const updated = await prisma.$transaction(async (tx: any) => {
       await tx.user.update({
         where: { id: userId },
         data: {

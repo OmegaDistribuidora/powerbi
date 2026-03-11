@@ -10,7 +10,7 @@ export async function registerAuditRoutes(app: FastifyInstance): Promise<void> {
     });
 
     return {
-      logs: logs.map((log) => ({
+      logs: logs.map((log: (typeof logs)[number]) => ({
         id: log.id,
         actorUserId: log.actorUserId,
         actorUsername: log.actorUsername,
