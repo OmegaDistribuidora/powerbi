@@ -11,6 +11,7 @@ const emptyReport = {
   categoryId: "",
   embedUrl: "",
   filterableFields: [],
+  userAssignments: [],
   active: true
 };
 
@@ -52,6 +53,24 @@ function blankField() {
     _key: crypto.randomUUID(),
     tableName: "",
     columnName: ""
+  };
+}
+
+function blankAssignmentRule() {
+  return {
+    _key: crypto.randomUUID(),
+    fieldKey: "",
+    tableName: "",
+    columnName: "",
+    value: ""
+  };
+}
+
+function blankAssignment() {
+  return {
+    _key: crypto.randomUUID(),
+    userId: "",
+    filterRules: []
   };
 }
 
@@ -189,8 +208,22 @@ export default function AdminPage() {
     }, {});
   }, [reports]);
 
+  const assignableUsers = useMemo(() => {
+    return [...users].sort((a, b) => a.displayName.localeCompare(b.displayName));
+  }, [users]);
+
   function reportNamesForUser(user) {
     return reports.filter((report) => user.reportIds.includes(report.id)).map((report) => report.name);
+  }
+
+  function availableReportAssignmentFields() {
+    return (reportForm.filterableFields || [])
+      .filter((field) => field.tableName && field.columnName)
+      .map((field) => ({
+        key: `${field.tableName}::${field.columnName}`,
+        tableName: field.tableName,
+        columnName: field.columnName
+      }));
   }
 
   function getSectionCount(sectionId) {
@@ -293,21 +326,25 @@ export default function AdminPage() {
 
     try {
       const payload = buildReportPayload(reportForm);
+      let savedReport;
 
       if (editingReportId) {
-        await apiJson(`/reports/${editingReportId}`, {
+        const response = await apiJson(`/reports/${editingReportId}`, {
           token,
           method: "PUT",
           data: payload
         });
+        savedReport = response.report;
       } else {
-        await apiJson("/reports", {
+        const response = await apiJson("/reports", {
           token,
           method: "POST",
           data: payload
         });
+        savedReport = response.report;
       }
 
+      await syncReportAssignments(savedReport.id, reportForm.userAssignments || [], payload.filterableFields || []);
       await loadData();
       closeReportModal();
       setNotice("Painel salvo com sucesso.");
@@ -490,6 +527,26 @@ export default function AdminPage() {
   function startEditingReport(report) {
     setError("");
     setNotice("");
+    const reportAssignments = users
+      .filter(
+        (user) =>
+          user.reportIds.includes(report.id) ||
+          (user.filterRules || []).some((rule) => rule.reportId === report.id)
+      )
+      .map((user) => ({
+        _key: crypto.randomUUID(),
+        userId: String(user.id),
+        filterRules: (user.filterRules || [])
+          .filter((rule) => rule.reportId === report.id)
+          .map((rule) => ({
+            _key: crypto.randomUUID(),
+            fieldKey: `${rule.tableName}::${rule.columnName}`,
+            tableName: rule.tableName,
+            columnName: rule.columnName,
+            value: rule.value
+          }))
+      }));
+
     setEditingReportId(report.id);
     setReportForm({
       name: report.name,
@@ -504,6 +561,7 @@ export default function AdminPage() {
         tableName: field.tableName,
         columnName: field.columnName
       })),
+      userAssignments: reportAssignments,
       active: report.active
     });
     setReportModalOpen(true);
@@ -532,6 +590,183 @@ export default function AdminPage() {
           columnName: field.columnName.trim()
         }))
     };
+  }
+
+  function addReportAssignment() {
+    setReportForm((current) => ({
+      ...current,
+      userAssignments: [...(current.userAssignments || []), blankAssignment()]
+    }));
+  }
+
+  function removeReportAssignment(index) {
+    setReportForm((current) => ({
+      ...current,
+      userAssignments: current.userAssignments.filter((_, assignmentIndex) => assignmentIndex !== index)
+    }));
+  }
+
+  function updateReportAssignment(index, patch) {
+    setReportForm((current) => ({
+      ...current,
+      userAssignments: current.userAssignments.map((assignment, assignmentIndex) => {
+        if (assignmentIndex !== index) {
+          return assignment;
+        }
+
+        return {
+          ...assignment,
+          ...patch
+        };
+      })
+    }));
+  }
+
+  function addAssignmentRule(assignmentIndex) {
+    setReportForm((current) => ({
+      ...current,
+      userAssignments: current.userAssignments.map((assignment, index) =>
+        index === assignmentIndex
+          ? {
+              ...assignment,
+              filterRules: [...assignment.filterRules, blankAssignmentRule()]
+            }
+          : assignment
+      )
+    }));
+  }
+
+  function removeAssignmentRule(assignmentIndex, ruleIndex) {
+    setReportForm((current) => ({
+      ...current,
+      userAssignments: current.userAssignments.map((assignment, index) =>
+        index === assignmentIndex
+          ? {
+              ...assignment,
+              filterRules: assignment.filterRules.filter((_, currentRuleIndex) => currentRuleIndex !== ruleIndex)
+            }
+          : assignment
+      )
+    }));
+  }
+
+  function updateAssignmentRule(assignmentIndex, ruleIndex, patch) {
+    setReportForm((current) => ({
+      ...current,
+      userAssignments: current.userAssignments.map((assignment, index) => {
+        if (index !== assignmentIndex) {
+          return assignment;
+        }
+
+        return {
+          ...assignment,
+          filterRules: assignment.filterRules.map((rule, currentRuleIndex) => {
+            if (currentRuleIndex !== ruleIndex) {
+              return rule;
+            }
+
+            const nextRule = { ...rule, ...patch };
+            if (Object.prototype.hasOwnProperty.call(patch, "fieldKey")) {
+              const selectedField = (current.filterableFields || [])
+                .filter((field) => field.tableName && field.columnName)
+                .map((field) => ({
+                  key: `${field.tableName}::${field.columnName}`,
+                  tableName: field.tableName,
+                  columnName: field.columnName
+                }))
+                .find((field) => field.key === patch.fieldKey);
+              nextRule.tableName = selectedField?.tableName || "";
+              nextRule.columnName = selectedField?.columnName || "";
+            }
+            return nextRule;
+          })
+        };
+      })
+    }));
+  }
+
+  function normalizeReportAssignments(assignments, filterableFields = []) {
+    const allowedFieldKeys = new Set(
+      filterableFields.map((field) => `${field.tableName.trim()}::${field.columnName.trim()}`)
+    );
+    const mergedAssignments = new Map();
+
+    assignments.forEach((assignment) => {
+      const userId = Number(assignment.userId);
+      if (!userId) {
+        return;
+      }
+
+      const normalizedRules = (assignment.filterRules || [])
+        .filter((rule) => {
+          if (!rule.tableName || !rule.columnName || !rule.value) {
+            return false;
+          }
+
+          return allowedFieldKeys.has(`${rule.tableName.trim()}::${rule.columnName.trim()}`);
+        })
+        .map((rule) => ({
+          reportId: null,
+          tableName: rule.tableName.trim(),
+          columnName: rule.columnName.trim(),
+          value: rule.value.trim()
+        }));
+
+      mergedAssignments.set(userId, {
+        userId,
+        filterRules: normalizedRules
+      });
+    });
+
+    return Array.from(mergedAssignments.values());
+  }
+
+  async function syncReportAssignments(reportId, assignments, filterableFields) {
+    const normalizedAssignments = normalizeReportAssignments(assignments, filterableFields);
+    const assignmentMap = new Map(normalizedAssignments.map((assignment) => [assignment.userId, assignment]));
+    const impactedUsers = users.filter(
+      (user) =>
+        assignmentMap.has(user.id) ||
+        user.reportIds.includes(reportId) ||
+        (user.filterRules || []).some((rule) => rule.reportId === reportId)
+    );
+
+    await Promise.all(
+      impactedUsers.map((user) => {
+        const assignment = assignmentMap.get(user.id);
+        const nextReportIds = assignment
+          ? Array.from(new Set([...user.reportIds, reportId]))
+          : user.reportIds.filter((currentReportId) => currentReportId !== reportId);
+
+        const otherRules = (user.filterRules || []).filter((rule) => rule.reportId !== reportId);
+        const nextFilterRules = assignment
+          ? [
+              ...otherRules,
+              ...assignment.filterRules.map((rule) => ({
+                reportId,
+                tableName: rule.tableName,
+                columnName: rule.columnName,
+                value: rule.value
+              }))
+            ]
+          : otherRules;
+
+        return apiJson(`/users/${user.id}`, {
+          token,
+          method: "PUT",
+          data: buildUserPayload({
+            username: user.username,
+            displayName: user.displayName,
+            profileLabel: user.profileLabel || "",
+            password: "",
+            role: user.role,
+            active: user.active,
+            reportIds: nextReportIds,
+            filterRules: nextFilterRules
+          })
+        });
+      })
+    );
   }
 
   function handleEmbedUrlChange(value) {
@@ -930,6 +1165,109 @@ export default function AdminPage() {
                 <button type="button" className="secondary-btn" onClick={addFilterableField}>
                   Adicionar campo filtravel
                 </button>
+              </div>
+            </fieldset>
+
+            <fieldset>
+              <legend>Distribuir painel para usuarios</legend>
+              <div className="form-stack compact">
+                {reportForm.userAssignments?.map((assignment, assignmentIndex) => {
+                  const selectedUserIds = reportForm.userAssignments
+                    .filter((_, index) => index !== assignmentIndex)
+                    .map((item) => Number(item.userId))
+                    .filter(Boolean);
+                  const availableFields = availableReportAssignmentFields();
+
+                  return (
+                    <article key={assignment._key} className="assignment-card">
+                      <div className="assignment-card-header">
+                        <label>
+                          Usuario
+                          <select
+                            value={assignment.userId}
+                            onChange={(event) =>
+                              updateReportAssignment(assignmentIndex, { userId: event.target.value })
+                            }
+                          >
+                            <option value="">Selecione um usuario</option>
+                            {assignableUsers.map((user) => (
+                              <option
+                                key={user.id}
+                                value={user.id}
+                                disabled={selectedUserIds.includes(user.id)}
+                              >
+                                {user.displayName}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+
+                        <button
+                          type="button"
+                          className="secondary-btn compact-btn"
+                          onClick={() => removeReportAssignment(assignmentIndex)}
+                        >
+                          Remover usuario
+                        </button>
+                      </div>
+
+                      <div className="form-stack compact">
+                        {assignment.filterRules.map((rule, ruleIndex) => (
+                          <div key={rule._key} className="assignment-rule-row">
+                            <select
+                              value={rule.fieldKey}
+                              onChange={(event) =>
+                                updateAssignmentRule(assignmentIndex, ruleIndex, {
+                                  fieldKey: event.target.value
+                                })
+                              }
+                            >
+                              <option value="">
+                                {availableFields.length ? "Selecione o campo" : "Cadastre campos acima"}
+                              </option>
+                              {availableFields.map((field) => (
+                                <option key={field.key} value={field.key}>
+                                  {field.tableName}.{field.columnName}
+                                </option>
+                              ))}
+                            </select>
+                            <input
+                              placeholder="Valor do filtro"
+                              value={rule.value}
+                              onChange={(event) =>
+                                updateAssignmentRule(assignmentIndex, ruleIndex, {
+                                  value: event.target.value
+                                })
+                              }
+                            />
+                            <button
+                              type="button"
+                              className="secondary-btn"
+                              onClick={() => removeAssignmentRule(assignmentIndex, ruleIndex)}
+                            >
+                              Remover
+                            </button>
+                          </div>
+                        ))}
+
+                        <button
+                          type="button"
+                          className="secondary-btn"
+                          onClick={() => addAssignmentRule(assignmentIndex)}
+                        >
+                          Adicionar filtro para este usuario
+                        </button>
+                      </div>
+                    </article>
+                  );
+                })}
+
+                <button type="button" className="secondary-btn" onClick={addReportAssignment}>
+                  Adicionar usuario ao painel
+                </button>
+                <p className="muted small">
+                  Ao salvar, o painel ja sera vinculado aos usuarios escolhidos com os filtros definidos aqui.
+                </p>
               </div>
             </fieldset>
 
