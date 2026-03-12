@@ -315,7 +315,7 @@ export default function AdminPage() {
 
       await loadData();
       closeCategoryModal();
-      setNotice("Pasta salva com sucesso.");
+      setNotice("Categoria salva com sucesso.");
     } catch (requestError) {
       setError(requestError.message);
     }
@@ -535,6 +535,11 @@ export default function AdminPage() {
     setError("");
     setNotice("");
 
+    const actionLabel = report.active ? "inativar" : "ativar";
+    if (!window.confirm(`Confirma ${actionLabel} o painel "${report.name}"?`)) {
+      return;
+    }
+
     try {
       await apiJson(`/reports/${report.id}`, {
         token,
@@ -561,6 +566,11 @@ export default function AdminPage() {
   async function toggleUserActive(user) {
     setError("");
     setNotice("");
+
+    const actionLabel = user.active ? "inativar" : "ativar";
+    if (!window.confirm(`Confirma ${actionLabel} o usuario "${user.displayName}"?`)) {
+      return;
+    }
 
     try {
       await apiJson(`/users/${user.id}`, {
@@ -599,7 +609,7 @@ export default function AdminPage() {
           </div>
           <div className="inline-actions">
             <button type="button" className="secondary-btn" onClick={openNewCategoryModal}>
-              Nova pasta
+              Nova categoria
             </button>
             <button type="button" className="secondary-btn" onClick={openNewReportModal}>
               Novo painel
@@ -616,15 +626,15 @@ export default function AdminPage() {
 
       <section className="page-card">
         <div className="header-line">
-          <h2>Pastas</h2>
-          <span className="muted small">{categories.length} pasta(s)</span>
+          <h2>Categorias</h2>
+          <span className="muted small">{categories.length} categoria(s)</span>
         </div>
         {!categories.length ? (
-          <p className="muted">Nenhuma pasta cadastrada.</p>
+          <p className="muted">Nenhuma categoria cadastrada.</p>
         ) : (
-          <div className="stack-list">
+          <div className="category-admin-grid">
             {categories.map((category) => (
-              <article key={category.id} className="admin-item-card">
+              <article key={category.id} className="admin-item-card admin-item-card-compact">
                 <div className="admin-item-header">
                   <div>
                     <strong className="category-title-inline" style={{ color: category.color }}>
@@ -637,14 +647,14 @@ export default function AdminPage() {
                       type="button"
                       className="icon-btn"
                       onClick={() => startEditingCategory(category)}
-                      aria-label={`Editar pasta ${category.name}`}
+                      aria-label={`Editar categoria ${category.name}`}
                     >
                       <FolderIcon />
                     </button>
                   </div>
                 </div>
                 <div className="related-block">
-                  <span className="muted small">Paineis nesta pasta</span>
+                  <span className="muted small">Paineis nesta categoria</span>
                   {category.reports?.length ? (
                     <div className="tag-list">
                       {category.reports.map((report) => (
@@ -836,7 +846,7 @@ export default function AdminPage() {
             </p>
 
             <label>
-              Pasta
+              Categoria
               <select
                 value={reportForm.categoryId}
                 onChange={(event) => setReportForm({ ...reportForm, categoryId: event.target.value })}
@@ -1053,7 +1063,7 @@ export default function AdminPage() {
       ) : null}
 
       {categoryModalOpen ? (
-        <Modal title={editingCategoryId ? "Editar pasta" : "Nova pasta"} onClose={closeCategoryModal}>
+        <Modal title={editingCategoryId ? "Editar categoria" : "Nova categoria"} onClose={closeCategoryModal}>
           <form className="form-stack" onSubmit={handleSaveCategory}>
             <label>
               Nome
@@ -1085,7 +1095,7 @@ export default function AdminPage() {
 
             <div className="inline-actions">
               <button type="submit" className="primary-btn">
-                Salvar pasta
+                Salvar categoria
               </button>
               <button type="button" className="secondary-btn" onClick={closeCategoryModal}>
                 Cancelar

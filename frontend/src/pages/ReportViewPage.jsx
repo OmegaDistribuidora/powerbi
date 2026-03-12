@@ -602,13 +602,15 @@ export default function ReportViewPage() {
     <div className="report-workspace">
       <section className="page-card report-main-card">
         {secureIframeMode ? (
-          <iframe
-            title={data.report.name}
-            src={secureIframeUrl}
-            className="report-embed-frame report-embed-large"
-            style={{ border: "none" }}
-            allowFullScreen
-          />
+          <div className="report-embed-frame report-embed-large secure-iframe-shell">
+            <iframe
+              title={data.report.name}
+              src={secureIframeUrl}
+              className="secure-iframe-frame"
+              style={{ border: "none" }}
+              allowFullScreen
+            />
+          </div>
         ) : !microsoftConfig.isConfigured ? (
           <div className="embed-placeholder">
             <p className="error-text">

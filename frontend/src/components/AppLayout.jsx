@@ -104,6 +104,7 @@ export default function AppLayout() {
   const [passwordSaving, setPasswordSaving] = useState(false);
   const [passwordError, setPasswordError] = useState("");
   const [passwordSuccess, setPasswordSuccess] = useState("");
+  const [collapsedCategories, setCollapsedCategories] = useState({});
 
   useEffect(() => {
     if (!token) {
@@ -143,6 +144,41 @@ export default function AppLayout() {
 
     return reports;
   }, [reports, user?.role]);
+
+  const groupedUserReports = useMemo(() => {
+    if (!userReports.length) {
+      return [];
+    }
+
+    const grouped = new Map();
+    categories.forEach((category) => grouped.set(category.id, { ...category, reports: [] }));
+
+    userReports.forEach((report) => {
+      if (report.category?.id && grouped.has(report.category.id)) {
+        grouped.get(report.category.id).reports.push(report);
+        return;
+      }
+
+      if (!grouped.has("uncategorized")) {
+        grouped.set("uncategorized", {
+          id: "uncategorized",
+          name: "Sem categoria",
+          color: "#9cb0d1",
+          reports: []
+        });
+      }
+      grouped.get("uncategorized").reports.push(report);
+    });
+
+    return Array.from(grouped.values()).filter((group) => group.reports.length);
+  }, [categories, userReports]);
+
+  function toggleCategory(categoryId) {
+    setCollapsedCategories((current) => ({
+      ...current,
+      [categoryId]: !current[categoryId]
+    }));
+  }
 
   function handleLogout() {
     logout();
@@ -184,51 +220,38 @@ export default function AppLayout() {
         </div>
 
         <nav className="nav-stack">
-          {userReports.length ? (
-            (() => {
-              const grouped = new Map();
-              categories.forEach((category) => grouped.set(category.id, { ...category, reports: [] }));
-
-              userReports.forEach((report) => {
-                if (report.category?.id && grouped.has(report.category.id)) {
-                  grouped.get(report.category.id).reports.push(report);
-                  return;
-                }
-
-                if (!grouped.has("uncategorized")) {
-                  grouped.set("uncategorized", {
-                    id: "uncategorized",
-                    name: "Sem categoria",
-                    color: "#9cb0d1",
-                    reports: []
-                  });
-                }
-                grouped.get("uncategorized").reports.push(report);
-              });
-
-              return Array.from(grouped.values())
-                .filter((group) => group.reports.length)
-                .map((group) => (
-                  <div key={group.id} className="sidebar-section">
-                    <div className="sidebar-section-title" style={{ color: group.color }}>
-                      {group.name}
-                    </div>
-                    <div className="sidebar-report-list">
-                      {group.reports.map((report) => (
-                        <NavLink key={report.id} to={`/reports/${report.id}`} className="nav-link nav-link-compact">
-                          {report.name}
-                        </NavLink>
-                      ))}
-                    </div>
-                  </div>
-                ));
-            })()
-          ) : null}
+          {groupedUserReports.map((group) => (
+            <div key={group.id} className="sidebar-category-card">
+              <button
+                type="button"
+                className="sidebar-category-toggle"
+                onClick={() => toggleCategory(group.id)}
+                aria-expanded={!collapsedCategories[group.id]}
+              >
+                <span className="sidebar-section-title" style={{ color: group.color }}>
+                  {group.name}
+                </span>
+                <span className="sidebar-category-arrow">{collapsedCategories[group.id] ? "+" : "-"}</span>
+              </button>
+              {!collapsedCategories[group.id] ? (
+                <div className="sidebar-report-list">
+                  {group.reports.map((report) => (
+                    <NavLink key={report.id} to={`/reports/${report.id}`} className="nav-link nav-link-compact">
+                      {report.name}
+                    </NavLink>
+                  ))}
+                </div>
+              ) : null}
+            </div>
+          ))}
           {reportsError && user?.role !== "ADMIN" ? <div className="muted small">{reportsError}</div> : null}
           {user?.role === "ADMIN" ? (
             <>
               <NavLink to="/admin" className="nav-link">
                 Administracao
+              </NavLink>
+              <NavLink to="/mapping" className="nav-link">
+                Mapeamento de paineis
               </NavLink>
               <NavLink to="/audit" className="nav-link">
                 Auditoria

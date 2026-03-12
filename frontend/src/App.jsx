@@ -7,6 +7,7 @@ import LoginPage from "./pages/LoginPage";
 import AdminPage from "./pages/AdminPage";
 import ReportViewPage from "./pages/ReportViewPage";
 import AuditPage from "./pages/AuditPage";
+import MappingPage from "./pages/MappingPage";
 
 export default function App() {
   return (
@@ -35,6 +36,14 @@ export default function App() {
           element={
             <AdminRoute>
               <AuditPage />
+            </AdminRoute>
+          }
+        />
+        <Route
+          path="mapping"
+          element={
+            <AdminRoute>
+              <MappingPage />
             </AdminRoute>
           }
         />
