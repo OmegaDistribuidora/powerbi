@@ -112,6 +112,8 @@ function buildSecureIframeUrl(report, filterRules) {
   const parsed = new URL(baseUrl);
   parsed.searchParams.set("autoAuth", "true");
   parsed.searchParams.set("chromeless", "true");
+  parsed.searchParams.set("navContentPaneEnabled", "false");
+  parsed.searchParams.set("pageName", "");
 
   if (microsoftConfig.tenantId && !parsed.searchParams.has("ctid")) {
     parsed.searchParams.set("ctid", microsoftConfig.tenantId);
@@ -645,7 +647,7 @@ export default function ReportViewPage() {
                 {(embedStatus === "idle" || embedStatus === "missing-config" || embedStatus === "needs-config") && "Aguardando"}
               </span>
             </div>
-            {microsoftConfig.isConfigured ? (
+            {!secureIframeMode && microsoftConfig.isConfigured ? (
               <button type="button" className="ghost-btn compact-btn" onClick={handleReconnectMicrosoft}>
                 {microsoftAccount ? "Trocar conta Microsoft" : "Entrar com Microsoft"}
               </button>
@@ -653,10 +655,12 @@ export default function ReportViewPage() {
           </div>
 
           <div className="report-meta-line">
-            <span className="muted small">
-              {microsoftAccount?.username ? `Conta Microsoft: ${microsoftAccount.username}` : "Nenhuma conta Microsoft conectada ainda."}
-            </span>
-            {embedStatus === "login-required" ? (
+            {!secureIframeMode ? (
+              <span className="muted small">
+                {microsoftAccount?.username ? `Conta Microsoft: ${microsoftAccount.username}` : "Nenhuma conta Microsoft conectada ainda."}
+              </span>
+            ) : null}
+            {!secureIframeMode && embedStatus === "login-required" ? (
               <span className="muted small">
                 Clique em <strong>Entrar com Microsoft</strong> para autorizar o Power BI e carregar este painel.
               </span>
@@ -698,6 +702,9 @@ export default function ReportViewPage() {
           <section className="side-panel-card">
             <details className="embed-details">
               <summary>Diagnostico</summary>
+              {secureIframeMode ? (
+                <p className="muted small">O diagnostico detalhado so fica disponivel no modo Power BI Client.</p>
+              ) : null}
               <div className="inline-actions">
                 <button type="button" className="secondary-btn" onClick={handleRefreshDiagnostics}>
                   Atualizar

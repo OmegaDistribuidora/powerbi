@@ -1,16 +1,17 @@
 import { useState } from "react";
-import { Navigate } from "react-router-dom";
+import { Navigate, useNavigate } from "react-router-dom";
 import { useAuth } from "../components/AuthProvider";
 
 export default function LoginPage() {
-  const { login, isAuthenticated } = useAuth();
+  const { login, isAuthenticated, user } = useAuth();
+  const navigate = useNavigate();
   const [username, setUsername] = useState("admin");
   const [password, setPassword] = useState("Omega@123");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
   if (isAuthenticated) {
-    return <Navigate to="/" replace />;
+    return <Navigate to={user?.role === "ADMIN" ? "/admin" : "/"} replace />;
   }
 
   async function handleSubmit(event) {
@@ -19,7 +20,8 @@ export default function LoginPage() {
 
     try {
       setLoading(true);
-      await login(username, password);
+      const payload = await login(username, password);
+      navigate(payload?.user?.role === "ADMIN" ? "/admin" : "/", { replace: true });
     } catch (requestError) {
       setError(requestError.message);
     } finally {

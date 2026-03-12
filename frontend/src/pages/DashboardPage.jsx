@@ -40,29 +40,8 @@ export default function DashboardPage() {
         <div>
           <div className="eyebrow">Bem-vindo</div>
           <h1>{data.user.displayName}</h1>
-          <p className="muted">Escolha um painel liberado para abrir o Power BI.</p>
+          <p className="muted">Selecione um painel a esquerda para acessar!</p>
         </div>
-      </section>
-
-      <section className="page-card">
-        <h2>Filtros do meu usuario</h2>
-        {!data.filters.length ? (
-          <p className="muted">Nenhuma regra de filtro cadastrada.</p>
-        ) : (
-          <div className="rules-list">
-            {data.filters.map((rule) => (
-              <div key={rule.id} className="rule-card">
-                <strong>
-                  {rule.tableName}.{rule.columnName}
-                </strong>
-                <span className="muted small">
-                  {rule.reportId ? `Somente no painel #${rule.reportId}` : "Todos os paineis"}
-                </span>
-                <span>Valor: {rule.value}</span>
-              </div>
-            ))}
-          </div>
-        )}
       </section>
     </div>
   );

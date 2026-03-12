@@ -77,6 +77,7 @@ export function AuthProvider({ children }) {
         });
         setToken(payload.token);
         setUser(payload.user);
+        return payload;
       },
       logout() {
         setToken(null);
