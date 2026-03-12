@@ -76,6 +76,60 @@ function buildEmbedUrl(report) {
   return `https://app.powerbi.com/reportEmbed?${params.toString()}`;
 }
 
+function hasGroupIdInUrl(url) {
+  if (!url) {
+    return false;
+  }
+
+  try {
+    const parsed = new URL(url);
+    return parsed.searchParams.has("groupId");
+  } catch {
+    return /[?&]groupId=/.test(url);
+  }
+}
+
+function shouldUseSecureIframe(report) {
+  return Boolean(report?.embedUrl && !hasGroupIdInUrl(report.embedUrl));
+}
+
+function formatFilterValueForUrl(rawValue) {
+  const normalized = normalizeFilterValue(rawValue);
+
+  if (typeof normalized === "number" || typeof normalized === "boolean") {
+    return String(normalized);
+  }
+
+  return `'${String(normalized).replace(/'/g, "''")}'`;
+}
+
+function buildSecureIframeUrl(report, filterRules) {
+  const baseUrl = report?.embedUrl || buildEmbedUrl(report);
+  if (!baseUrl) {
+    return "";
+  }
+
+  const parsed = new URL(baseUrl);
+  parsed.searchParams.set("autoAuth", "true");
+  parsed.searchParams.set("chromeless", "true");
+
+  if (microsoftConfig.tenantId && !parsed.searchParams.has("ctid")) {
+    parsed.searchParams.set("ctid", microsoftConfig.tenantId);
+  }
+
+  if (filterRules.length) {
+    const expression = filterRules
+      .map((rule) => `${rule.tableName}/${rule.columnName} eq ${formatFilterValueForUrl(rule.value)}`)
+      .join(" and ");
+
+    parsed.searchParams.set("filter", expression);
+  } else {
+    parsed.searchParams.delete("filter");
+  }
+
+  return parsed.toString();
+}
+
 function formatPowerBiApiError(response, payload) {
   const apiMessage =
     payload?.error?.message ||
@@ -177,6 +231,16 @@ export default function ReportViewPage() {
     return data ? buildEmbedUrl(data.report) : "";
   }, [data, resolvedEmbed]);
 
+  const secureIframeMode = useMemo(() => (data ? shouldUseSecureIframe(data.report) : false), [data]);
+
+  const secureIframeUrl = useMemo(() => {
+    if (!data || !secureIframeMode) {
+      return "";
+    }
+
+    return buildSecureIframeUrl(data.report, data.filters || []);
+  }, [data, secureIframeMode]);
+
   useEffect(() => {
     let active = true;
 
@@ -245,7 +309,37 @@ export default function ReportViewPage() {
     let cancelled = false;
 
     async function embedReport() {
-      if (!data || !containerRef.current) {
+      if (!data) {
+        return;
+      }
+
+      if (secureIframeMode) {
+        setResolvedEmbed({
+          embedUrl: secureIframeUrl,
+          datasetId: data.report.datasetId || null,
+          source: "secure-iframe"
+        });
+        setEmbedError("");
+        setEmbedStatus("rendered");
+        setDiagnostics((current) => ({
+          ...current,
+          requestedRules: data.filters || [],
+          requestedFilters: data.filters || [],
+          appliedFilters: [],
+          activePage: null,
+          pageFilters: [],
+          apiMetadata: {
+            embedUrl: secureIframeUrl,
+            datasetId: data.report.datasetId || null,
+            source: "secure-iframe"
+          },
+          lastError: "",
+          events: ["Painel carregado em modo secure iframe com filtros por URL."]
+        }));
+        return;
+      }
+
+      if (!containerRef.current) {
         return;
       }
 
@@ -443,7 +537,7 @@ export default function ReportViewPage() {
     return () => {
       cancelled = true;
     };
-  }, [data, embedUrl]);
+  }, [data, embedUrl, secureIframeMode, secureIframeUrl]);
 
   async function handleReconnectMicrosoft() {
     setEmbedError("");
@@ -505,7 +599,15 @@ export default function ReportViewPage() {
   return (
     <div className="report-workspace">
       <section className="page-card report-main-card">
-        {!microsoftConfig.isConfigured ? (
+        {secureIframeMode ? (
+          <iframe
+            title={data.report.name}
+            src={secureIframeUrl}
+            className="report-embed-frame report-embed-large"
+            style={{ border: "none" }}
+            allowFullScreen
+          />
+        ) : !microsoftConfig.isConfigured ? (
           <div className="embed-placeholder">
             <p className="error-text">
               Defina VITE_MICROSOFT_CLIENT_ID e VITE_MICROSOFT_TENANT_ID no frontend para habilitar o Power BI.
