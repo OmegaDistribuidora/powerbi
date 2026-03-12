@@ -618,6 +618,29 @@ label {
   background: rgba(255, 255, 255, 0.03);
 }
 
+.assignment-user-grid {
+  display: grid;
+  gap: 10px;
+}
+
+.assignment-user-card {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border-radius: 16px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.assignment-user-card.is-selected {
+  background: rgba(255, 123, 44, 0.05);
+  border-color: rgba(255, 123, 44, 0.25);
+}
+
+.assignment-user-toggle {
+  margin: 0;
+}
+
 .assignment-card-header {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;

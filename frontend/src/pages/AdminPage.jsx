@@ -622,6 +622,40 @@ export default function AdminPage() {
     }));
   }
 
+  function toggleReportAssignmentForUser(userId, enabled) {
+    setReportForm((current) => {
+      const currentAssignments = current.userAssignments || [];
+      const existingIndex = currentAssignments.findIndex((assignment) => Number(assignment.userId) === userId);
+
+      if (enabled) {
+        if (existingIndex >= 0) {
+          return current;
+        }
+
+        return {
+          ...current,
+          userAssignments: [
+            ...currentAssignments,
+            {
+              _key: crypto.randomUUID(),
+              userId: String(userId),
+              filterRules: []
+            }
+          ]
+        };
+      }
+
+      if (existingIndex < 0) {
+        return current;
+      }
+
+      return {
+        ...current,
+        userAssignments: currentAssignments.filter((_, assignmentIndex) => assignmentIndex !== existingIndex)
+      };
+    });
+  }
+
   function addAssignmentRule(assignmentIndex) {
     setReportForm((current) => ({
       ...current,
@@ -1171,100 +1205,81 @@ export default function AdminPage() {
             <fieldset>
               <legend>Distribuir painel para usuarios</legend>
               <div className="form-stack compact">
-                {reportForm.userAssignments?.map((assignment, assignmentIndex) => {
-                  const selectedUserIds = reportForm.userAssignments
-                    .filter((_, index) => index !== assignmentIndex)
-                    .map((item) => Number(item.userId))
-                    .filter(Boolean);
-                  const availableFields = availableReportAssignmentFields();
+                <div className="assignment-user-grid">
+                  {assignableUsers.map((user) => {
+                    const assignmentIndex = (reportForm.userAssignments || []).findIndex(
+                      (assignment) => Number(assignment.userId) === user.id
+                    );
+                    const assignment = assignmentIndex >= 0 ? reportForm.userAssignments[assignmentIndex] : null;
+                    const availableFields = availableReportAssignmentFields();
 
-                  return (
-                    <article key={assignment._key} className="assignment-card">
-                      <div className="assignment-card-header">
-                        <label>
-                          Usuario
-                          <select
-                            value={assignment.userId}
-                            onChange={(event) =>
-                              updateReportAssignment(assignmentIndex, { userId: event.target.value })
-                            }
-                          >
-                            <option value="">Selecione um usuario</option>
-                            {assignableUsers.map((user) => (
-                              <option
-                                key={user.id}
-                                value={user.id}
-                                disabled={selectedUserIds.includes(user.id)}
-                              >
-                                {user.displayName}
-                              </option>
-                            ))}
-                          </select>
+                    return (
+                      <article
+                        key={user.id}
+                        className={`assignment-user-card ${assignment ? "is-selected" : ""}`}
+                      >
+                        <label className="check-row assignment-user-toggle">
+                          <input
+                            type="checkbox"
+                            checked={Boolean(assignment)}
+                            onChange={(event) => toggleReportAssignmentForUser(user.id, event.target.checked)}
+                          />
+                          <span>{user.displayName}</span>
                         </label>
 
-                        <button
-                          type="button"
-                          className="secondary-btn compact-btn"
-                          onClick={() => removeReportAssignment(assignmentIndex)}
-                        >
-                          Remover usuario
-                        </button>
-                      </div>
+                        {assignment ? (
+                          <div className="form-stack compact">
+                            {assignment.filterRules.map((rule, ruleIndex) => (
+                              <div key={rule._key} className="assignment-rule-row">
+                                <select
+                                  value={rule.fieldKey}
+                                  onChange={(event) =>
+                                    updateAssignmentRule(assignmentIndex, ruleIndex, {
+                                      fieldKey: event.target.value
+                                    })
+                                  }
+                                >
+                                  <option value="">
+                                    {availableFields.length ? "Selecione o campo" : "Cadastre campos acima"}
+                                  </option>
+                                  {availableFields.map((field) => (
+                                    <option key={field.key} value={field.key}>
+                                      {field.tableName}.{field.columnName}
+                                    </option>
+                                  ))}
+                                </select>
+                                <input
+                                  placeholder="Valor do filtro"
+                                  value={rule.value}
+                                  onChange={(event) =>
+                                    updateAssignmentRule(assignmentIndex, ruleIndex, {
+                                      value: event.target.value
+                                    })
+                                  }
+                                />
+                                <button
+                                  type="button"
+                                  className="secondary-btn"
+                                  onClick={() => removeAssignmentRule(assignmentIndex, ruleIndex)}
+                                >
+                                  Remover
+                                </button>
+                              </div>
+                            ))}
 
-                      <div className="form-stack compact">
-                        {assignment.filterRules.map((rule, ruleIndex) => (
-                          <div key={rule._key} className="assignment-rule-row">
-                            <select
-                              value={rule.fieldKey}
-                              onChange={(event) =>
-                                updateAssignmentRule(assignmentIndex, ruleIndex, {
-                                  fieldKey: event.target.value
-                                })
-                              }
-                            >
-                              <option value="">
-                                {availableFields.length ? "Selecione o campo" : "Cadastre campos acima"}
-                              </option>
-                              {availableFields.map((field) => (
-                                <option key={field.key} value={field.key}>
-                                  {field.tableName}.{field.columnName}
-                                </option>
-                              ))}
-                            </select>
-                            <input
-                              placeholder="Valor do filtro"
-                              value={rule.value}
-                              onChange={(event) =>
-                                updateAssignmentRule(assignmentIndex, ruleIndex, {
-                                  value: event.target.value
-                                })
-                              }
-                            />
                             <button
                               type="button"
                               className="secondary-btn"
-                              onClick={() => removeAssignmentRule(assignmentIndex, ruleIndex)}
+                              onClick={() => addAssignmentRule(assignmentIndex)}
                             >
-                              Remover
+                              Adicionar filtro
                             </button>
                           </div>
-                        ))}
-
-                        <button
-                          type="button"
-                          className="secondary-btn"
-                          onClick={() => addAssignmentRule(assignmentIndex)}
-                        >
-                          Adicionar filtro para este usuario
-                        </button>
-                      </div>
-                    </article>
-                  );
-                })}
-
-                <button type="button" className="secondary-btn" onClick={addReportAssignment}>
-                  Adicionar usuario ao painel
-                </button>
+                        ) : null}
+                      </article>
+                    );
+                  })}
+                </div>
                 <p className="muted small">
                   Ao salvar, o painel ja sera vinculado aos usuarios escolhidos com os filtros definidos aqui.
                 </p>
