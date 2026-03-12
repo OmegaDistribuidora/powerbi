@@ -76,6 +76,28 @@ function buildEmbedUrl(report) {
   return `https://app.powerbi.com/reportEmbed?${params.toString()}`;
 }
 
+function formatPowerBiApiError(response, payload) {
+  const apiMessage =
+    payload?.error?.message ||
+    payload?.message ||
+    payload?.error_description ||
+    payload?.errorCode ||
+    payload?.error;
+
+  const apiCode = payload?.error?.code || payload?.errorCode || payload?.code;
+  const statusLabel = response?.status ? `HTTP ${response.status}` : "HTTP desconhecido";
+
+  if (apiCode && apiMessage) {
+    return `${statusLabel} - ${apiCode}: ${apiMessage}`;
+  }
+
+  if (apiMessage) {
+    return `${statusLabel} - ${apiMessage}`;
+  }
+
+  return `${statusLabel} - Nao foi possivel consultar o relatorio no Power BI.`;
+}
+
 async function fetchReportMetadata(report, accessToken) {
   if (!report.workspaceId || !report.reportKey) {
     return {
@@ -96,7 +118,7 @@ async function fetchReportMetadata(report, accessToken) {
   const payload = await response.json().catch(() => null);
 
   if (!response.ok) {
-    throw new Error(payload?.message || payload?.error?.message || "Nao foi possivel consultar o relatorio no Power BI.");
+    throw new Error(formatPowerBiApiError(response, payload));
   }
 
   return {
