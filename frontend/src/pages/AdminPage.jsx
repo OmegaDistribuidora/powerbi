@@ -828,29 +828,12 @@ export default function AdminPage() {
               <input
                 value={reportForm.embedUrl}
                 onChange={(event) => handleEmbedUrlChange(event.target.value)}
-                placeholder="https://app.powerbi.com/reportEmbed?reportId=...&groupId=..."
+                placeholder="https://app.powerbi.com/reportEmbed?reportId=...&autoAuth=true&ctid=..."
               />
             </label>
             <p className="muted small">
-              Ao colar o link embed, o sistema tenta preencher automaticamente o Report ID e o Workspace ID quando esses dados
-              estiverem no URL.
+              Use o link de Arquivo &gt; Inserir relatorio &gt; Site ou portal.
             </p>
-
-            <label>
-              Workspace ID
-              <input
-                value={reportForm.workspaceId}
-                onChange={(event) => setReportForm({ ...reportForm, workspaceId: event.target.value })}
-              />
-            </label>
-
-            <label>
-              Report ID
-              <input
-                value={reportForm.reportKey}
-                onChange={(event) => setReportForm({ ...reportForm, reportKey: event.target.value })}
-              />
-            </label>
 
             <label>
               Pasta

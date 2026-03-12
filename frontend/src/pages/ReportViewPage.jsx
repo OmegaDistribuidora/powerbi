@@ -689,12 +689,8 @@ export default function ReportViewPage() {
             <div className="eyebrow">Configuracao</div>
             <div className="side-meta-list">
               <div>
-                <span className="muted small">Workspace</span>
-                <strong>{data.report.workspaceId || "-"}</strong>
-              </div>
-              <div>
-                <span className="muted small">Report ID</span>
-                <strong>{data.report.reportKey || "-"}</strong>
+                <span className="muted small">Modo de exibicao</span>
+                <strong>{secureIframeMode ? "Secure iframe" : "Power BI Client"}</strong>
               </div>
             </div>
           </section>
