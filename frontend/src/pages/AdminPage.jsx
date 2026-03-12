@@ -209,7 +209,9 @@ export default function AdminPage() {
   }, [reports]);
 
   const assignableUsers = useMemo(() => {
-    return [...users].sort((a, b) => a.displayName.localeCompare(b.displayName));
+    return users
+      .filter((user) => user.active)
+      .sort((a, b) => a.displayName.localeCompare(b.displayName));
   }, [users]);
 
   function reportNamesForUser(user) {
