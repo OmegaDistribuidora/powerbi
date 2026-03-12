@@ -31,6 +31,12 @@ const emptyUser = {
   filterRules: []
 };
 
+const adminSections = [
+  { id: "categories", label: "Categorias", singular: "categoria" },
+  { id: "reports", label: "Paineis", singular: "painel" },
+  { id: "users", label: "Usuarios", singular: "usuario" }
+];
+
 function blankRule() {
   return {
     _key: crypto.randomUUID(),
@@ -150,6 +156,7 @@ export default function AdminPage() {
   const [userModalOpen, setUserModalOpen] = useState(false);
   const [reportModalOpen, setReportModalOpen] = useState(false);
   const [categoryModalOpen, setCategoryModalOpen] = useState(false);
+  const [activeSection, setActiveSection] = useState("categories");
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
 
@@ -184,6 +191,28 @@ export default function AdminPage() {
 
   function reportNamesForUser(user) {
     return reports.filter((report) => user.reportIds.includes(report.id)).map((report) => report.name);
+  }
+
+  function getSectionCount(sectionId) {
+    if (sectionId === "categories") {
+      return categories.length;
+    }
+    if (sectionId === "reports") {
+      return reports.length;
+    }
+    return users.length;
+  }
+
+  function handleCreateForSection(sectionId) {
+    if (sectionId === "categories") {
+      openNewCategoryModal();
+      return;
+    }
+    if (sectionId === "reports") {
+      openNewReportModal();
+      return;
+    }
+    openNewUserModal();
   }
 
   function availableFieldOptions(rule) {
@@ -601,22 +630,11 @@ export default function AdminPage() {
 
   return (
     <div className="page-stack">
-      <section className="page-card admin-toolbar-card">
+      <section className="page-card admin-toolbar-card admin-toolbar-card-compact">
         <div className="header-line">
           <div className="admin-toolbar-copy">
             <div className="eyebrow">Administracao</div>
-            <h1>Usuarios, paineis e filtros</h1>
-          </div>
-          <div className="inline-actions">
-            <button type="button" className="secondary-btn" onClick={openNewCategoryModal}>
-              Nova categoria
-            </button>
-            <button type="button" className="secondary-btn" onClick={openNewReportModal}>
-              Novo painel
-            </button>
-            <button type="button" className="primary-btn" onClick={openNewUserModal}>
-              Novo usuario
-            </button>
+            <h1>Paineis, usuarios e categorias</h1>
           </div>
         </div>
 
@@ -624,193 +642,222 @@ export default function AdminPage() {
         {notice ? <p className="success-text">{notice}</p> : null}
       </section>
 
-      <section className="page-card">
-        <div className="header-line">
-          <h2>Categorias</h2>
-          <span className="muted small">{categories.length} categoria(s)</span>
-        </div>
-        {!categories.length ? (
-          <p className="muted">Nenhuma categoria cadastrada.</p>
-        ) : (
-          <div className="category-admin-grid">
-            {categories.map((category) => (
-              <article key={category.id} className="admin-item-card admin-item-card-compact">
-                <div className="admin-item-header">
+      <section className="page-card admin-shell-card">
+        <div className="admin-shell-layout">
+          <aside className="admin-side-nav">
+            <div className="sidebar-section-title">Gerenciar</div>
+            <div className="admin-section-nav">
+              {adminSections.map((section) => (
+                <button
+                  key={section.id}
+                  type="button"
+                  className={`admin-section-link ${activeSection === section.id ? "active" : ""}`}
+                  onClick={() => setActiveSection(section.id)}
+                >
+                  <span>{section.label}</span>
+                  <span className="status-dot is-muted">{getSectionCount(section.id)}</span>
+                </button>
+              ))}
+            </div>
+
+            <div className="admin-side-create">
+              <div className="muted small">Acao rapida</div>
+              <button
+                type="button"
+                className="primary-btn"
+                onClick={() => handleCreateForSection(activeSection)}
+              >
+                Novo {adminSections.find((section) => section.id === activeSection)?.singular}
+              </button>
+            </div>
+          </aside>
+
+          <div className="admin-section-panel">
+            {activeSection === "categories" ? (
+              <>
+                <div className="header-line">
                   <div>
-                    <strong className="category-title-inline" style={{ color: category.color }}>
-                      {category.name}
-                    </strong>
-                    <p className="muted small">Ordem: {category.sortOrder}</p>
+                    <h2>Categorias</h2>
+                    <p className="muted small">Agrupe os paineis por tema e cor.</p>
                   </div>
-                  <div className="admin-item-actions">
-                    <button
-                      type="button"
-                      className="icon-btn"
-                      onClick={() => startEditingCategory(category)}
-                      aria-label={`Editar categoria ${category.name}`}
-                    >
-                      <FolderIcon />
-                    </button>
+                  <span className="muted small">{categories.length} categoria(s)</span>
+                </div>
+                {!categories.length ? (
+                  <p className="muted">Nenhuma categoria cadastrada.</p>
+                ) : (
+                  <div className="admin-row-list">
+                    {categories.map((category) => (
+                      <article key={category.id} className="admin-row-card">
+                        <div className="admin-row-main">
+                          <div className="admin-row-title">
+                            <span className="color-swatch" style={{ background: category.color }} />
+                            <strong className="category-title-inline" style={{ color: category.color }}>
+                              {category.name}
+                            </strong>
+                            <span className="muted small">Ordem {category.sortOrder}</span>
+                          </div>
+                          <div className="admin-row-meta">
+                            <span className="tag-chip tag-chip-muted">
+                              {category.reports?.length || 0} painel(is)
+                            </span>
+                            {category.reports?.slice(0, 8).map((report) => (
+                              <span key={`${category.id}-${report.id}`} className="tag-chip">
+                                {report.name}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                        <div className="admin-row-actions">
+                          <button
+                            type="button"
+                            className="icon-btn"
+                            onClick={() => startEditingCategory(category)}
+                            aria-label={`Editar categoria ${category.name}`}
+                          >
+                            <FolderIcon />
+                          </button>
+                        </div>
+                      </article>
+                    ))}
                   </div>
-                </div>
-                <div className="related-block">
-                  <span className="muted small">Paineis nesta categoria</span>
-                  {category.reports?.length ? (
-                    <div className="tag-list">
-                      {category.reports.map((report) => (
-                        <span key={`${category.id}-${report.id}`} className="tag-chip">
-                          {report.name}
-                        </span>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="muted small">Nenhum painel vinculado.</p>
-                  )}
-                </div>
-              </article>
-            ))}
-          </div>
-        )}
-      </section>
+                )}
+              </>
+            ) : null}
 
-      <section className="admin-overview-grid">
-        <article className="page-card">
-          <div className="header-line">
-            <h2>Paineis cadastrados</h2>
-            <span className="muted small">{reports.length} painel(is)</span>
-          </div>
-          {!reports.length ? (
-            <p className="muted">Nenhum painel cadastrado.</p>
-          ) : (
-            <div className="stack-list">
-              {reports.map((report) => {
-                const allowedUsers = reportUsersMap[report.id] || [];
-                return (
-                  <article key={report.id} className="admin-item-card">
-                    <div className="admin-item-header">
-                      <div>
-                        <strong>{report.name}</strong>
-                        <p className="muted small">{report.category?.name || "Sem categoria"}</p>
-                      </div>
-                      <div className="admin-item-actions">
-                        <span className={`status-dot ${report.active ? "is-success" : "is-muted"}`}>
-                          {report.active ? "Ativo" : "Inativo"}
-                        </span>
-                        <button
-                          type="button"
-                          className="icon-btn"
-                          onClick={() => toggleReportActive(report)}
-                          aria-label={`${report.active ? "Inativar" : "Ativar"} painel ${report.name}`}
-                        >
-                          <PowerIcon />
-                        </button>
-                        <button
-                          type="button"
-                          className="icon-btn"
-                          onClick={() => startEditingReport(report)}
-                          aria-label={`Editar painel ${report.name}`}
-                        >
-                          <PencilIcon />
-                        </button>
-                      </div>
-                    </div>
-                    <div className="related-block">
-                      <span className="muted small">Usuarios com acesso</span>
-                      {allowedUsers.length ? (
-                        <div className="tag-list">
-                          {allowedUsers.map((user) => (
-                            <span key={user.id} className="tag-chip">
-                              {user.displayName}
-                            </span>
-                          ))}
-                        </div>
-                      ) : (
-                        <p className="muted small">Nenhum usuario vinculado.</p>
-                      )}
-                    </div>
-                    <div className="related-block">
-                      <span className="muted small">Campos permitidos para filtro</span>
-                      {(report.filterableFields || []).length ? (
-                        <div className="tag-list">
-                          {report.filterableFields.map((field) => (
-                            <span key={`${report.id}-${field.tableName}-${field.columnName}`} className="tag-chip">
-                              {field.tableName}.{field.columnName}
-                            </span>
-                          ))}
-                        </div>
-                      ) : (
-                        <p className="muted small">Nenhum campo configurado.</p>
-                      )}
-                    </div>
-                  </article>
-                );
-              })}
-            </div>
-          )}
-        </article>
+            {activeSection === "reports" ? (
+              <>
+                <div className="header-line">
+                  <div>
+                    <h2>Paineis</h2>
+                    <p className="muted small">Lista compacta para localizar e editar rapidamente.</p>
+                  </div>
+                  <span className="muted small">{reports.length} painel(is)</span>
+                </div>
+                {!reports.length ? (
+                  <p className="muted">Nenhum painel cadastrado.</p>
+                ) : (
+                  <div className="admin-row-list">
+                    {reports.map((report) => {
+                      const allowedUsers = reportUsersMap[report.id] || [];
+                      return (
+                        <article key={report.id} className="admin-row-card">
+                          <div className="admin-row-main">
+                            <div className="admin-row-title">
+                              <strong>{report.name}</strong>
+                              <span className="muted small">{report.category?.name || "Sem categoria"}</span>
+                            </div>
+                            <div className="admin-row-meta">
+                              <span className={`status-dot ${report.active ? "is-success" : "is-muted"}`}>
+                                {report.active ? "Ativo" : "Inativo"}
+                              </span>
+                              {allowedUsers.length ? (
+                                allowedUsers.slice(0, 8).map((user) => (
+                                  <span key={user.id} className="tag-chip">
+                                    {user.displayName}
+                                  </span>
+                                ))
+                              ) : (
+                                <span className="tag-chip tag-chip-muted">Sem usuarios</span>
+                              )}
+                              {(report.filterableFields || []).slice(0, 5).map((field) => (
+                                <span key={`${report.id}-${field.tableName}-${field.columnName}`} className="tag-chip tag-chip-accent">
+                                  {field.tableName}.{field.columnName}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                          <div className="admin-row-actions">
+                            <button
+                              type="button"
+                              className="icon-btn"
+                              onClick={() => toggleReportActive(report)}
+                              aria-label={`${report.active ? "Inativar" : "Ativar"} painel ${report.name}`}
+                            >
+                              <PowerIcon />
+                            </button>
+                            <button
+                              type="button"
+                              className="icon-btn"
+                              onClick={() => startEditingReport(report)}
+                              aria-label={`Editar painel ${report.name}`}
+                            >
+                              <PencilIcon />
+                            </button>
+                          </div>
+                        </article>
+                      );
+                    })}
+                  </div>
+                )}
+              </>
+            ) : null}
 
-        <article className="page-card">
-          <div className="header-line">
-            <h2>Usuarios cadastrados</h2>
-            <span className="muted small">{users.length} usuario(s)</span>
+            {activeSection === "users" ? (
+              <>
+                <div className="header-line">
+                  <div>
+                    <h2>Usuarios</h2>
+                    <p className="muted small">Visualizacao densa para acompanhar todos os acessos.</p>
+                  </div>
+                  <span className="muted small">{users.length} usuario(s)</span>
+                </div>
+                {!users.length ? (
+                  <p className="muted">Nenhum usuario cadastrado.</p>
+                ) : (
+                  <div className="admin-row-list">
+                    {users.map((user) => {
+                      const availableReports = reportNamesForUser(user);
+                      return (
+                        <article key={user.id} className="admin-row-card">
+                          <div className="admin-row-main">
+                            <div className="admin-row-title">
+                              <strong>{user.displayName}</strong>
+                              <span className="muted small">
+                                {user.username} · {user.role === "ADMIN" ? "Administrador" : "Usuario"}
+                              </span>
+                            </div>
+                            <div className="admin-row-meta">
+                              <span className={`status-dot ${user.active ? "is-success" : "is-muted"}`}>
+                                {user.active ? "Ativo" : "Inativo"}
+                              </span>
+                              {availableReports.length ? (
+                                availableReports.slice(0, 8).map((reportName) => (
+                                  <span key={`${user.id}-${reportName}`} className="tag-chip">
+                                    {reportName}
+                                  </span>
+                                ))
+                              ) : (
+                                <span className="tag-chip tag-chip-muted">Sem paineis</span>
+                              )}
+                            </div>
+                          </div>
+                          <div className="admin-row-actions">
+                            <button
+                              type="button"
+                              className="icon-btn"
+                              onClick={() => toggleUserActive(user)}
+                              aria-label={`${user.active ? "Inativar" : "Ativar"} usuario ${user.displayName}`}
+                            >
+                              <PowerIcon />
+                            </button>
+                            <button
+                              type="button"
+                              className="icon-btn"
+                              onClick={() => startEditingUser(user)}
+                              aria-label={`Editar usuario ${user.displayName}`}
+                            >
+                              <PencilIcon />
+                            </button>
+                          </div>
+                        </article>
+                      );
+                    })}
+                  </div>
+                )}
+              </>
+            ) : null}
           </div>
-          {!users.length ? (
-            <p className="muted">Nenhum usuario cadastrado.</p>
-          ) : (
-            <div className="stack-list">
-              {users.map((user) => {
-                const availableReports = reportNamesForUser(user);
-                return (
-                  <article key={user.id} className="admin-item-card">
-                    <div className="admin-item-header">
-                      <div>
-                        <strong>{user.displayName}</strong>
-                        <p className="muted small">
-                          {user.username} · {user.role === "ADMIN" ? "Administrador" : "Usuario"}
-                        </p>
-                      </div>
-                      <div className="admin-item-actions">
-                        <span className={`status-dot ${user.active ? "is-success" : "is-muted"}`}>
-                          {user.active ? "Ativo" : "Inativo"}
-                        </span>
-                        <button
-                          type="button"
-                          className="icon-btn"
-                          onClick={() => toggleUserActive(user)}
-                          aria-label={`${user.active ? "Inativar" : "Ativar"} usuario ${user.displayName}`}
-                        >
-                          <PowerIcon />
-                        </button>
-                        <button
-                          type="button"
-                          className="icon-btn"
-                          onClick={() => startEditingUser(user)}
-                          aria-label={`Editar usuario ${user.displayName}`}
-                        >
-                          <PencilIcon />
-                        </button>
-                      </div>
-                    </div>
-                    <div className="related-block">
-                      <span className="muted small">Paineis liberados</span>
-                      {availableReports.length ? (
-                        <div className="tag-list">
-                          {availableReports.map((reportName) => (
-                            <span key={`${user.id}-${reportName}`} className="tag-chip">
-                              {reportName}
-                            </span>
-                          ))}
-                        </div>
-                      ) : (
-                        <p className="muted small">Nenhum painel vinculado.</p>
-                      )}
-                    </div>
-                  </article>
-                );
-              })}
-            </div>
-          )}
-        </article>
+        </div>
       </section>
 
       {reportModalOpen ? (
@@ -1076,11 +1123,22 @@ export default function AdminPage() {
 
             <label>
               Cor do titulo
-              <input
-                type="color"
-                value={categoryForm.color}
-                onChange={(event) => setCategoryForm({ ...categoryForm, color: event.target.value })}
-              />
+              <div className="color-picker-row">
+                <span className="color-swatch color-swatch-lg" style={{ background: categoryForm.color }} />
+                <input
+                  className="color-text-input"
+                  value={categoryForm.color}
+                  onChange={(event) => setCategoryForm({ ...categoryForm, color: event.target.value })}
+                  placeholder="#ff7b2c"
+                />
+                <input
+                  className="color-picker-input"
+                  type="color"
+                  value={categoryForm.color}
+                  onChange={(event) => setCategoryForm({ ...categoryForm, color: event.target.value })}
+                  aria-label="Selecionar cor da categoria"
+                />
+              </div>
             </label>
 
             <label>
