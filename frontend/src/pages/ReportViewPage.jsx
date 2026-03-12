@@ -99,6 +99,14 @@ function formatPowerBiApiError(response, payload) {
 }
 
 async function fetchReportMetadata(report, accessToken) {
+  if (report.embedUrl) {
+    return {
+      embedUrl: report.embedUrl,
+      datasetId: report.datasetId || null,
+      source: "saved-embed-url"
+    };
+  }
+
   if (!report.workspaceId || !report.reportKey) {
     return {
       embedUrl: buildEmbedUrl(report),
@@ -118,12 +126,23 @@ async function fetchReportMetadata(report, accessToken) {
   const payload = await response.json().catch(() => null);
 
   if (!response.ok) {
+    const fallbackEmbedUrl = buildEmbedUrl(report);
+    if (fallbackEmbedUrl) {
+      return {
+        embedUrl: fallbackEmbedUrl,
+        datasetId: report.datasetId || null,
+        source: "fallback-embed-url",
+        warning: formatPowerBiApiError(response, payload)
+      };
+    }
+
     throw new Error(formatPowerBiApiError(response, payload));
   }
 
   return {
     embedUrl: payload?.embedUrl || buildEmbedUrl(report),
-    datasetId: payload?.datasetId || report.datasetId || null
+    datasetId: payload?.datasetId || report.datasetId || null,
+    source: "powerbi-api"
   };
 }
 
@@ -283,7 +302,14 @@ export default function ReportViewPage() {
           activePage: null,
           pageFilters: [],
           lastError: "",
-          events: [...current.events, "Metadata do relatorio carregada pela API do Power BI."]
+          events: [
+            ...current.events,
+            metadata?.source === "saved-embed-url"
+              ? "Embed URL salva do painel foi usada diretamente."
+              : metadata?.source === "fallback-embed-url"
+                ? `Consulta da API do Power BI falhou; usando Embed URL direta. ${metadata.warning}`
+                : "Metadata do relatorio carregada pela API do Power BI."
+          ]
         }));
 
         const embeddedReport = powerbiService.embed(containerRef.current, {
