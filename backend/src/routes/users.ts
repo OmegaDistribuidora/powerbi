@@ -338,4 +338,46 @@ export async function registerUserRoutes(app: FastifyInstance): Promise<void> {
 
     return { user: serializeUser(updated) };
   });
+
+  app.delete("/api/users/:id", { preHandler: [requireAuth, requireAdmin] }, async (request, reply) => {
+    const userId = Number(request.params && (request.params as { id: string }).id);
+    if (!Number.isInteger(userId) || userId <= 0) {
+      return reply.code(400).send({ message: "Usuario invalido." });
+    }
+
+    const current = await prisma.user.findUnique({
+      where: { id: userId },
+      include: {
+        reportAccess: { select: { reportId: true } },
+        filterRules: true
+      }
+    });
+    if (!current) {
+      return reply.code(404).send({ message: "Usuario nao encontrado." });
+    }
+
+    const authUser = request.authUser;
+    const beforeSnapshot = userAuditSnapshot(serializeUser(current));
+
+    await prisma.$transaction(async (tx: any) => {
+      await tx.user.delete({
+        where: { id: userId }
+      });
+
+      await recordAudit(
+        {
+          actor: authUser,
+          action: "DELETE_USER",
+          entityType: "USER",
+          entityId: userId,
+          summary: `${current.displayName} foi excluido.`,
+          before: beforeSnapshot,
+          after: null
+        },
+        tx
+      );
+    });
+
+    return reply.code(204).send();
+  });
 }

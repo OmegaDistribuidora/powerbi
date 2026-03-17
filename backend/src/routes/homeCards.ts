@@ -269,4 +269,55 @@ export async function registerHomeCardRoutes(app: FastifyInstance): Promise<void
 
     return { card: serializeHomeCard(card) };
   });
+
+  app.delete("/api/home-cards/:id", { preHandler: [requireAuth, requireAdmin] }, async (request, reply) => {
+    const cardId = Number((request.params as { id?: string })?.id);
+    if (!Number.isInteger(cardId) || cardId <= 0) {
+      return reply.code(400).send({ message: "Card invalido." });
+    }
+
+    const current = await (prisma as any).homeCard.findUnique({
+      where: { id: cardId },
+      include: {
+        accesses: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                displayName: true,
+                active: true
+              }
+            }
+          }
+        }
+      }
+    });
+    if (!current) {
+      return reply.code(404).send({ message: "Card nao encontrado." });
+    }
+
+    const authUser = request.authUser;
+    const before = serializeHomeCard(current);
+
+    await prisma.$transaction(async (tx: any) => {
+      await (tx as any).homeCard.delete({
+        where: { id: cardId }
+      });
+
+      await recordAudit(
+        {
+          actor: authUser,
+          action: "DELETE_HOME_CARD",
+          entityType: "HOME_CARD",
+          entityId: cardId,
+          summary: `Card inicial ${current.title} foi excluido.`,
+          before,
+          after: null
+        },
+        tx
+      );
+    });
+
+    return reply.code(204).send();
+  });
 }

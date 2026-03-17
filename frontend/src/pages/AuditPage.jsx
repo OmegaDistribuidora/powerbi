@@ -47,7 +47,7 @@ function actionTone(action) {
   if (action.includes("REPORT")) {
     return "is-report";
   }
-  if (action.includes("USER")) {
+  if (action.includes("USER") || action.includes("HOME_CARD")) {
     return "is-user";
   }
   return "is-default";
@@ -98,9 +98,90 @@ function matchesPeriod(log, period) {
   return fortalezaMonthKey(logDate) === fortalezaMonthKey(now);
 }
 
+function isPlainObject(value) {
+  return value != null && typeof value === "object" && !Array.isArray(value);
+}
+
+function stableStringify(value) {
+  return JSON.stringify(value);
+}
+
+function normalizeAuditValue(value, stripId = false) {
+  if (Array.isArray(value)) {
+    return value
+      .map((item) => normalizeAuditValue(item, true))
+      .sort((a, b) => stableStringify(a).localeCompare(stableStringify(b)));
+  }
+
+  if (isPlainObject(value)) {
+    return Object.keys(value)
+      .sort()
+      .reduce((accumulator, key) => {
+        if (stripId && key === "id") {
+          return accumulator;
+        }
+
+        accumulator[key] = normalizeAuditValue(value[key], false);
+        return accumulator;
+      }, {});
+  }
+
+  return value ?? null;
+}
+
+function buildChangedPair(before, after) {
+  const normalizedBefore = normalizeAuditValue(before);
+  const normalizedAfter = normalizeAuditValue(after);
+
+  if (stableStringify(normalizedBefore) === stableStringify(normalizedAfter)) {
+    return null;
+  }
+
+  if (Array.isArray(normalizedBefore) || Array.isArray(normalizedAfter)) {
+    return {
+      before: normalizedBefore,
+      after: normalizedAfter
+    };
+  }
+
+  if (isPlainObject(normalizedBefore) && isPlainObject(normalizedAfter)) {
+    const beforeResult = {};
+    const afterResult = {};
+    const keys = Array.from(new Set([...Object.keys(normalizedBefore), ...Object.keys(normalizedAfter)])).sort();
+
+    keys.forEach((key) => {
+      const childDiff = buildChangedPair(normalizedBefore[key], normalizedAfter[key]);
+      if (!childDiff) {
+        return;
+      }
+
+      beforeResult[key] = childDiff.before;
+      afterResult[key] = childDiff.after;
+    });
+
+    if (!Object.keys(beforeResult).length && !Object.keys(afterResult).length) {
+      return null;
+    }
+
+    return {
+      before: beforeResult,
+      after: afterResult
+    };
+  }
+
+  return {
+    before: normalizedBefore,
+    after: normalizedAfter
+  };
+}
+
 function AuditDetailsModal({ log, onClose }) {
   const showBefore = shouldShowBefore(log);
   const afterLabel = isViewReportEvent(log) ? "Detalhes da visualizacao" : "Novo valor";
+  const changedPair = showBefore ? buildChangedPair(log.before, log.after) : null;
+  const resolvedBefore = changedPair?.before ?? null;
+  const resolvedAfter = changedPair?.after ?? log.after;
+  const hasRelevantChanges = !showBefore || Boolean(changedPair);
 
   return (
     <div className="modal-backdrop" role="presentation" onClick={onClose}>
@@ -141,15 +222,19 @@ function AuditDetailsModal({ log, onClose }) {
         </div>
 
         <div className="audit-detail-grid">
-          {showBefore ? (
+          {showBefore && hasRelevantChanges ? (
             <div>
               <span className="muted small">Valor anterior</span>
-              <pre>{JSON.stringify(log.before, null, 2)}</pre>
+              <pre>{JSON.stringify(resolvedBefore, null, 2)}</pre>
             </div>
           ) : null}
-          <div className={showBefore ? "" : "audit-detail-full"}>
+          <div className={showBefore && hasRelevantChanges ? "" : "audit-detail-full"}>
             <span className="muted small">{afterLabel}</span>
-            <pre>{JSON.stringify(log.after, null, 2)}</pre>
+            <pre>
+              {hasRelevantChanges
+                ? JSON.stringify(resolvedAfter, null, 2)
+                : "Nenhuma alteracao relevante foi detectada entre o valor anterior e o novo valor."}
+            </pre>
           </div>
         </div>
 

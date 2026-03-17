@@ -266,6 +266,50 @@ export async function registerReportRoutes(app: FastifyInstance): Promise<void> 
     return { report: serializeReport(report) };
   });
 
+  app.delete("/api/reports/:id", { preHandler: [requireAuth, requireAdmin] }, async (request, reply) => {
+    const reportId = Number(request.params && (request.params as { id: string }).id);
+    if (!Number.isInteger(reportId) || reportId <= 0) {
+      return reply.code(400).send({ message: "Painel invalido." });
+    }
+
+    const current = await prisma.report.findUnique({
+      where: { id: reportId },
+      include: {
+        category: true,
+        filterableFields: {
+          orderBy: [{ tableName: "asc" }, { columnName: "asc" }]
+        }
+      }
+    } as any);
+    if (!current) {
+      return reply.code(404).send({ message: "Painel nao encontrado." });
+    }
+
+    const authUser = request.authUser;
+    const beforeSnapshot = reportAuditSnapshot(serializeReport(current));
+
+    await prisma.$transaction(async (tx: any) => {
+      await tx.report.delete({
+        where: { id: reportId }
+      });
+
+      await recordAudit(
+        {
+          actor: authUser,
+          action: "DELETE_REPORT",
+          entityType: "REPORT",
+          entityId: reportId,
+          summary: `Painel ${current.name} foi excluido.`,
+          before: beforeSnapshot,
+          after: null
+        },
+        tx
+      );
+    });
+
+    return reply.code(204).send();
+  });
+
   app.get("/api/reports/:id/view", { preHandler: [requireAuth] }, async (request, reply) => {
     const reportId = Number(request.params && (request.params as { id: string }).id);
     if (!Number.isInteger(reportId) || reportId <= 0) {

@@ -152,6 +152,17 @@ label {
   border: 1px solid var(--border);
 }
 
+.danger-btn {
+  border-color: rgba(255, 96, 96, 0.28);
+  background: rgba(255, 96, 96, 0.1);
+  color: #ffd0d0;
+}
+
+.danger-btn:hover {
+  border-color: rgba(255, 96, 96, 0.42);
+  background: rgba(255, 96, 96, 0.16);
+}
+
 .ghost-btn {
   width: 100%;
 }

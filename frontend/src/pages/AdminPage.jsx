@@ -212,7 +212,7 @@ function Modal({ title, children, onClose }) {
 }
 
 export default function AdminPage() {
-  const { token } = useAuth();
+  const { token, user: authUser } = useAuth();
   const [homeCards, setHomeCards] = useState([]);
   const [users, setUsers] = useState([]);
   const [reports, setReports] = useState([]);
@@ -633,6 +633,37 @@ export default function AdminPage() {
       await loadData();
       closeUserModal();
       setNotice("Usuario salvo com sucesso.");
+    } catch (requestError) {
+      setError(requestError.message);
+    }
+  }
+
+  async function toggleHomeCardActive(card) {
+    setError("");
+    setNotice("");
+
+    const actionLabel = card.active ? "inativar" : "ativar";
+    if (!window.confirm(`Confirma ${actionLabel} o card "${card.title}"?`)) {
+      return;
+    }
+
+    try {
+      await apiJson(`/home-cards/${card.id}`, {
+        token,
+        method: "PUT",
+        data: {
+          title: card.title,
+          description: card.description || "",
+          imageUrl: card.imageUrl || "",
+          actionLabel: card.actionLabel || "",
+          actionUrl: card.actionUrl || "",
+          sortOrder: Number(card.sortOrder) || 0,
+          userIds: card.userIds || [],
+          active: !card.active
+        }
+      });
+      await loadData();
+      setNotice(`Card ${!card.active ? "ativado" : "inativado"} com sucesso.`);
     } catch (requestError) {
       setError(requestError.message);
     }
@@ -1214,6 +1245,81 @@ export default function AdminPage() {
     }
   }
 
+  async function deleteHomeCard() {
+    if (!editingHomeCardId) {
+      return;
+    }
+
+    if (!window.confirm(`Confirma excluir o card "${homeCardForm.title}"?`)) {
+      return;
+    }
+
+    setError("");
+    setNotice("");
+
+    try {
+      await apiJson(`/home-cards/${editingHomeCardId}`, {
+        token,
+        method: "DELETE"
+      });
+      await loadData();
+      closeHomeCardModal();
+      setNotice("Card excluido com sucesso.");
+    } catch (requestError) {
+      setError(requestError.message);
+    }
+  }
+
+  async function deleteReport() {
+    if (!editingReportId) {
+      return;
+    }
+
+    if (!window.confirm(`Confirma excluir o painel "${reportForm.name}"?`)) {
+      return;
+    }
+
+    setError("");
+    setNotice("");
+
+    try {
+      await apiJson(`/reports/${editingReportId}`, {
+        token,
+        method: "DELETE"
+      });
+      await loadData();
+      closeReportModal();
+      setNotice("Painel excluido com sucesso.");
+    } catch (requestError) {
+      setError(requestError.message);
+    }
+  }
+
+  async function deleteUser() {
+    if (!editingUserId) {
+      return;
+    }
+
+    if (!window.confirm(`Confirma excluir o usuario "${userForm.displayName}"?`)) {
+      return;
+    }
+
+    setError("");
+    setNotice("");
+
+    try {
+      await apiJson(`/users/${editingUserId}`, {
+        token,
+        method: "DELETE"
+      });
+      await loadData();
+      closeUserModal();
+      setNotice("Usuario excluido com sucesso.");
+    } catch (requestError) {
+      setError(requestError.message);
+    }
+  }
+
   return (
     <div className="page-stack">
       <section className="page-card admin-toolbar-card admin-toolbar-card-compact">
@@ -1289,12 +1395,9 @@ export default function AdminPage() {
                             {card.description ? (
                               <span className="tag-chip tag-chip-wide">{shortenText(card.description, 96)}</span>
                             ) : null}
-                            {card.actionLabel ? <span className="tag-chip">{card.actionLabel}</span> : null}
-                            {card.users?.slice(0, 6).map((user) => (
-                              <span key={`${card.id}-${user.id}`} className="tag-chip">
-                                {user.displayName}
-                              </span>
-                            ))}
+                            <span className="tag-chip tag-chip-muted">
+                              {(card.users || []).length} usuario(s)
+                            </span>
                             {card.actionUrl ? (
                               <span className="tag-chip tag-chip-accent" title={card.actionUrl}>
                                 {summarizeLink(card.actionUrl)}
@@ -1303,6 +1406,14 @@ export default function AdminPage() {
                           </div>
                         </div>
                         <div className="admin-row-actions">
+                          <button
+                            type="button"
+                            className="icon-btn"
+                            onClick={() => toggleHomeCardActive(card)}
+                            aria-label={`${card.active ? "Inativar" : "Ativar"} card ${card.title}`}
+                          >
+                            <PowerIcon />
+                          </button>
                           <button
                             type="button"
                             className="icon-btn"
@@ -1672,6 +1783,11 @@ export default function AdminPage() {
               <button type="button" className="secondary-btn" onClick={closeHomeCardModal}>
                 Cancelar
               </button>
+              {editingHomeCardId ? (
+                <button type="button" className="secondary-btn danger-btn" onClick={deleteHomeCard}>
+                  Excluir
+                </button>
+              ) : null}
             </div>
           </form>
         </Modal>
@@ -1874,6 +1990,11 @@ export default function AdminPage() {
               <button type="button" className="secondary-btn" onClick={closeReportModal}>
                 Cancelar
               </button>
+              {editingReportId ? (
+                <button type="button" className="secondary-btn danger-btn" onClick={deleteReport}>
+                  Excluir
+                </button>
+              ) : null}
             </div>
           </form>
         </Modal>
@@ -2056,6 +2177,11 @@ export default function AdminPage() {
               <button type="button" className="secondary-btn" onClick={closeUserModal}>
                 Cancelar
               </button>
+              {editingUserId && authUser?.id !== editingUserId ? (
+                <button type="button" className="secondary-btn danger-btn" onClick={deleteUser}>
+                  Excluir
+                </button>
+              ) : null}
             </div>
           </form>
         </Modal>
