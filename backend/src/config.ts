@@ -21,5 +21,6 @@ export const env = {
   databaseUrl: process.env.DATABASE_URL || "",
   adminUsername: String(process.env.ADMIN_USERNAME || "admin").trim().toLowerCase(),
   adminPassword: String(process.env.ADMIN_PASSWORD || "Omega@123"),
-  adminDisplayName: String(process.env.ADMIN_DISPLAY_NAME || "Administrador").trim()
+  adminDisplayName: String(process.env.ADMIN_DISPLAY_NAME || "Administrador").trim(),
+  previewsDir: String(process.env.PREVIEWS_DIR || "/previews").trim()
 };

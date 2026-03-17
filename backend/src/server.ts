@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import Fastify from "fastify";
 import cors from "@fastify/cors";
+import fastifyMultipart from "@fastify/multipart";
 import fastifyStatic from "@fastify/static";
 import { env } from "./config";
 import prisma from "./lib/prisma";
@@ -29,6 +30,12 @@ async function bootstrap(): Promise<void> {
     credentials: true
   });
 
+  await app.register(fastifyMultipart, {
+    limits: {
+      fileSize: 10 * 1024 * 1024
+    }
+  });
+
   app.get("/api/health", async () => ({ status: "ok" }));
 
   await registerAuthRoutes(app);
@@ -38,6 +45,15 @@ async function bootstrap(): Promise<void> {
   await registerHomeCardRoutes(app);
   await registerDashboardRoutes(app);
   await registerAuditRoutes(app);
+
+  if (env.previewsDir) {
+    fs.mkdirSync(env.previewsDir, { recursive: true });
+    await app.register(fastifyStatic, {
+      root: env.previewsDir,
+      prefix: "/previews/",
+      decorateReply: false
+    });
+  }
 
   const frontendDist = path.resolve(__dirname, "..", "..", "frontend", "dist");
   if (fs.existsSync(frontendDist)) {

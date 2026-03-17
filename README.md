@@ -8,6 +8,7 @@ Sistema interno para gerenciar acesso a paineis do Power BI por usuario, com:
 - cadastro de paineis
 - vinculo usuario -> paineis
 - regras de filtro dinamicas por usuario
+- cards customizaveis na pagina inicial
 
 ## Stack
 
@@ -42,10 +43,15 @@ npm run dev
 - Backend: `http://localhost:3000`
 - Frontend: `http://localhost:5173`
 
-## Login inicial
+## Usuario administrador
 
-- Usuario: `admin`
-- Senha: `Omega@123`
+O usuario administrador inicial e criado automaticamente pelo backend usando as variaveis:
+
+- `ADMIN_USERNAME`
+- `ADMIN_PASSWORD`
+- `ADMIN_DISPLAY_NAME`
+
+Defina esses valores no ambiente local e no Railway. Evite registrar credenciais reais no repositorio.
 
 ## Variaveis do frontend para Power BI Pro
 
@@ -57,6 +63,14 @@ Para embutir relatorios usando a conta Microsoft do usuario:
 - `VITE_POWERBI_SCOPE`: por padrao `https://analysis.windows.net/powerbi/api/Report.Read.All`
 
 O usuario final precisa ter conta Microsoft no tenant e permissao/licenca para abrir o relatorio no Power BI.
+
+## Upload de previews
+
+Os previews dos cards da home podem ser enviados pelo admin.
+
+- Em producao, defina `PREVIEWS_DIR` apontando para o volume persistente montado no Railway
+- Exemplo de uso com volume: `PREVIEWS_DIR=/previews`
+- Os arquivos enviados passam a ser servidos pelo backend em `/previews/...`
 
 ## Proximos passos
 

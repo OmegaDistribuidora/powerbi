@@ -28,6 +28,7 @@ const emptyHomeCard = {
   actionLabel: "",
   actionUrl: "",
   sortOrder: 0,
+  userIds: [],
   active: true
 };
 
@@ -187,6 +188,8 @@ export default function AdminPage() {
   const [editingReportId, setEditingReportId] = useState(null);
   const [editingCategoryId, setEditingCategoryId] = useState(null);
   const [homeCardModalOpen, setHomeCardModalOpen] = useState(false);
+  const [homeCardUploadError, setHomeCardUploadError] = useState("");
+  const [homeCardUploading, setHomeCardUploading] = useState(false);
   const [userModalOpen, setUserModalOpen] = useState(false);
   const [reportModalOpen, setReportModalOpen] = useState(false);
   const [categoryModalOpen, setCategoryModalOpen] = useState(false);
@@ -230,6 +233,26 @@ export default function AdminPage() {
       .filter((user) => user.active)
       .sort((a, b) => a.displayName.localeCompare(b.displayName));
   }, [users]);
+
+  async function uploadHomeCardPreview(file) {
+    const formData = new FormData();
+    formData.append("file", file);
+
+    const response = await fetch("/api/home-cards/upload-preview", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`
+      },
+      body: formData
+    });
+
+    const payload = await response.json().catch(() => null);
+    if (!response.ok) {
+      throw new Error(payload?.message || "Falha ao enviar imagem.");
+    }
+
+    return payload;
+  }
 
   function reportNamesForUser(user) {
     return reports.filter((report) => user.reportIds.includes(report.id)).map((report) => report.name);
@@ -313,6 +336,8 @@ export default function AdminPage() {
     setHomeCardModalOpen(false);
     setEditingHomeCardId(null);
     setHomeCardForm(emptyHomeCard);
+    setHomeCardUploadError("");
+    setHomeCardUploading(false);
   }
 
   function closeReportModal() {
@@ -340,6 +365,7 @@ export default function AdminPage() {
     setNotice("");
     setEditingHomeCardId(null);
     setHomeCardForm(emptyHomeCard);
+    setHomeCardUploadError("");
     setHomeCardModalOpen(true);
   }
 
@@ -440,6 +466,7 @@ export default function AdminPage() {
         actionLabel: homeCardForm.actionLabel.trim(),
         actionUrl: homeCardForm.actionUrl.trim(),
         sortOrder: Number(homeCardForm.sortOrder) || 0,
+        userIds: homeCardForm.userIds,
         active: homeCardForm.active
       };
 
@@ -606,6 +633,7 @@ export default function AdminPage() {
     setError("");
     setNotice("");
     setEditingHomeCardId(card.id);
+    setHomeCardUploadError("");
     setHomeCardForm({
       title: card.title,
       description: card.description || "",
@@ -613,6 +641,7 @@ export default function AdminPage() {
       actionLabel: card.actionLabel || "",
       actionUrl: card.actionUrl || "",
       sortOrder: card.sortOrder ?? 0,
+      userIds: card.userIds || [],
       active: card.active
     });
     setHomeCardModalOpen(true);
@@ -1065,6 +1094,11 @@ export default function AdminPage() {
                           <div className="admin-row-meta">
                             {card.description ? <span className="tag-chip tag-chip-wide">{card.description}</span> : null}
                             {card.actionLabel ? <span className="tag-chip">{card.actionLabel}</span> : null}
+                            {card.users?.slice(0, 6).map((user) => (
+                              <span key={`${card.id}-${user.id}`} className="tag-chip">
+                                {user.displayName}
+                              </span>
+                            ))}
                             {card.actionUrl ? <span className="tag-chip tag-chip-accent">{card.actionUrl}</span> : null}
                           </div>
                         </div>
@@ -1296,12 +1330,46 @@ export default function AdminPage() {
 
             <label>
               Imagem de preview
+              <div className="home-card-upload-row">
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={async (event) => {
+                    const file = event.target.files?.[0];
+                    if (!file) {
+                      return;
+                    }
+
+                    try {
+                      setHomeCardUploadError("");
+                      setHomeCardUploading(true);
+                      const payload = await uploadHomeCardPreview(file);
+                      setHomeCardForm((current) => ({
+                        ...current,
+                        imageUrl: payload.imageUrl
+                      }));
+                    } catch (uploadError) {
+                      setHomeCardUploadError(uploadError.message);
+                    } finally {
+                      setHomeCardUploading(false);
+                      event.target.value = "";
+                    }
+                  }}
+                />
+                {homeCardUploading ? <span className="muted small">Enviando imagem...</span> : null}
+              </div>
               <input
                 value={homeCardForm.imageUrl}
                 onChange={(event) => setHomeCardForm({ ...homeCardForm, imageUrl: event.target.value })}
-                placeholder="https://..."
+                placeholder="/previews/arquivo.png"
               />
             </label>
+            {homeCardUploadError ? <p className="error-text">{homeCardUploadError}</p> : null}
+            {homeCardForm.imageUrl ? (
+              <div className="home-card-preview-box">
+                <img src={homeCardForm.imageUrl} alt="Preview do card" />
+              </div>
+            ) : null}
 
             <label>
               Texto do botao
@@ -1339,6 +1407,29 @@ export default function AdminPage() {
               />
               <span>Card ativo</span>
             </label>
+
+            <fieldset>
+              <legend>Usuarios com acesso</legend>
+              <div className="check-grid">
+                {assignableUsers.map((user) => (
+                  <label key={user.id} className="check-row">
+                    <input
+                      type="checkbox"
+                      checked={homeCardForm.userIds.includes(user.id)}
+                      onChange={(event) =>
+                        setHomeCardForm((current) => ({
+                          ...current,
+                          userIds: event.target.checked
+                            ? Array.from(new Set([...current.userIds, user.id]))
+                            : current.userIds.filter((currentUserId) => currentUserId !== user.id)
+                        }))
+                      }
+                    />
+                    <span>{user.displayName}</span>
+                  </label>
+                ))}
+              </div>
+            </fieldset>
 
             <div className="inline-actions">
               <button type="submit" className="primary-btn">

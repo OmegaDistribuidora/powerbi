@@ -56,7 +56,17 @@ export async function registerDashboardRoutes(app: FastifyInstance): Promise<voi
             .filter((report: { active: boolean }) => report.active);
 
     const homeCards = await (prisma as any).homeCard.findMany({
-      where: { active: true },
+      where:
+        user.role === "ADMIN"
+          ? {}
+          : {
+              active: true,
+              accesses: {
+                some: {
+                  userId: user.id
+                }
+              }
+            },
       orderBy: [{ sortOrder: "asc" }, { title: "asc" }]
     });
 

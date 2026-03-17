@@ -25,6 +25,7 @@ model User {
   role          UserRole           @default(USER)
   active        Boolean            @default(true)
   reportAccess  UserReportAccess[]
+  homeCardAccesses HomeCardAccess[]
   filterRules   FilterRule[]
   auditLogs     AuditLog[]
   createdAt     DateTime           @default(now())
@@ -68,8 +69,20 @@ model HomeCard {
   actionUrl   String?
   sortOrder   Int      @default(0)
   active      Boolean  @default(true)
+  accesses    HomeCardAccess[]
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+}
+
+model HomeCardAccess {
+  homeCardId Int
+  userId     Int
+  homeCard   HomeCard @relation(fields: [homeCardId], references: [id], onDelete: Cascade)
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+
+  @@id([homeCardId, userId])
+  @@index([userId])
 }
 
 model ReportFilterField {
