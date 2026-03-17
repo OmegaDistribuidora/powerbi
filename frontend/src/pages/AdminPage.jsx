@@ -268,6 +268,10 @@ export default function AdminPage() {
     }, {});
   }, [reports]);
 
+  const activeReports = useMemo(() => reports.filter((report) => report.active), [reports]);
+
+  const activeReportIds = useMemo(() => new Set(activeReports.map((report) => report.id)), [activeReports]);
+
   const assignableUsers = useMemo(() => {
     return users
       .filter((user) => user.active && user.role !== "ADMIN")
@@ -329,6 +333,35 @@ export default function AdminPage() {
         return a.label.localeCompare(b.label);
       });
   }, [reports]);
+
+  const activeReportsGroupedByCategory = useMemo(() => {
+    const groups = new Map();
+    activeReports.forEach((report) => {
+      const key = report.category?.id ? `category-${report.category.id}` : "uncategorized";
+      if (!groups.has(key)) {
+        groups.set(key, {
+          key,
+          label: getReportCategoryLabel(report),
+          color: report.category?.color || "",
+          sortOrder: report.category?.sortOrder ?? Number.MAX_SAFE_INTEGER,
+          items: []
+        });
+      }
+      groups.get(key).items.push(report);
+    });
+
+    return Array.from(groups.values())
+      .map((group) => ({
+        ...group,
+        items: group.items.sort((a, b) => a.name.localeCompare(b.name))
+      }))
+      .sort((a, b) => {
+        if (a.sortOrder !== b.sortOrder) {
+          return a.sortOrder - b.sortOrder;
+        }
+        return a.label.localeCompare(b.label);
+      });
+  }, [activeReports]);
 
   const reportCategoryOptions = useMemo(
     () => reportsGroupedByCategory.map((group) => ({ key: group.key, label: group.label })),
@@ -396,7 +429,7 @@ export default function AdminPage() {
     if (user.role === "ADMIN") {
       return [];
     }
-    return reports.filter((report) => user.reportIds.includes(report.id)).map((report) => report.name);
+    return activeReports.filter((report) => user.reportIds.includes(report.id)).map((report) => report.name);
   }
 
   function availableReportAssignmentFields() {
@@ -439,7 +472,9 @@ export default function AdminPage() {
   }
 
   function availableFieldOptions(rule) {
-    const selectedReportIds = rule.reportId ? [Number(rule.reportId)] : userForm.reportIds;
+    const selectedReportIds = (rule.reportId ? [Number(rule.reportId)] : userForm.reportIds).filter((reportId) =>
+      activeReportIds.has(reportId)
+    );
     const merged = new Map();
 
     selectedReportIds.forEach((reportId) => {
@@ -808,6 +843,17 @@ export default function AdminPage() {
   function startEditingUser(user) {
     setError("");
     setNotice("");
+    const nextReportIds = (user.reportIds || []).filter((reportId) => activeReportIds.has(reportId));
+    const nextFilterRules = (user.filterRules || [])
+      .filter((rule) => rule.reportId == null || activeReportIds.has(rule.reportId))
+      .map((rule) => ({
+        _key: crypto.randomUUID(),
+        reportId: rule.reportId ?? null,
+        tableName: rule.tableName,
+        columnName: rule.columnName,
+        value: rule.value
+      }));
+
     setEditingUserId(user.id);
     setUserForm({
       username: user.username,
@@ -816,14 +862,8 @@ export default function AdminPage() {
       password: "",
       role: user.role,
       active: user.active,
-      reportIds: user.reportIds || [],
-      filterRules: (user.filterRules || []).map((rule) => ({
-        _key: crypto.randomUUID(),
-        reportId: rule.reportId ?? null,
-        tableName: rule.tableName,
-        columnName: rule.columnName,
-        value: rule.value
-      }))
+      reportIds: nextReportIds,
+      filterRules: nextFilterRules
     });
     setUserModalOpen(true);
   }
@@ -1191,8 +1231,15 @@ export default function AdminPage() {
 
     return {
       ...form,
+      reportIds: form.reportIds.filter((reportId) => activeReportIds.has(reportId)),
       filterRules: form.filterRules
-        .filter((rule) => rule.tableName && rule.columnName && rule.value)
+        .filter(
+          (rule) =>
+            rule.tableName &&
+            rule.columnName &&
+            rule.value &&
+            (rule.reportId == null || activeReportIds.has(Number(rule.reportId)))
+        )
         .map((rule) => ({
           reportId: rule.reportId ? Number(rule.reportId) : null,
           tableName: rule.tableName,
@@ -2101,7 +2148,7 @@ export default function AdminPage() {
               <fieldset>
                 <legend>Painéis liberados</legend>
                 <div className="selection-group-grid">
-                  {reportsGroupedByCategory.map((group) => {
+                  {activeReportsGroupedByCategory.map((group) => {
                     const groupReportIds = group.items.map((report) => report.id);
                     const allSelected = groupReportIds.every((reportId) => userForm.reportIds.includes(reportId));
 
@@ -2155,7 +2202,7 @@ export default function AdminPage() {
                         }
                       >
                         <option value="">Todos os painéis selecionados</option>
-                        {reports
+                        {activeReports
                           .filter((report) => userForm.reportIds.includes(report.id))
                           .map((report) => (
                             <option key={report.id} value={report.id}>
