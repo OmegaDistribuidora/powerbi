@@ -59,6 +59,19 @@ model ReportCategory {
   updatedAt DateTime @updatedAt
 }
 
+model HomeCard {
+  id          Int      @id @default(autoincrement())
+  title       String
+  description String?
+  imageUrl    String?
+  actionLabel String?
+  actionUrl   String?
+  sortOrder   Int      @default(0)
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
 model ReportFilterField {
   id         Int      @id @default(autoincrement())
   reportId   Int

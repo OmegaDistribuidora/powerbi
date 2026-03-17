@@ -12,6 +12,7 @@ import { registerReportRoutes } from "./routes/reports";
 import { registerDashboardRoutes } from "./routes/dashboard";
 import { registerAuditRoutes } from "./routes/audit";
 import { registerReportCategoryRoutes } from "./routes/reportCategories";
+import { registerHomeCardRoutes } from "./routes/homeCards";
 import type { AuthUser } from "./types";
 
 declare module "fastify" {
@@ -34,6 +35,7 @@ async function bootstrap(): Promise<void> {
   await registerUserRoutes(app);
   await registerReportRoutes(app);
   await registerReportCategoryRoutes(app);
+  await registerHomeCardRoutes(app);
   await registerDashboardRoutes(app);
   await registerAuditRoutes(app);
 

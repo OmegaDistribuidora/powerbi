@@ -215,8 +215,9 @@ export default function AppLayout() {
     <div className="app-shell">
       <aside className="sidebar">
         <div>
-          <div className="brand">Power BI Hub</div>
-          <div className="muted small">Paineis e filtros por usuario</div>
+          <NavLink to="/" className="brand brand-link">
+            Power BI Hub
+          </NavLink>
         </div>
 
         <nav className="nav-stack">

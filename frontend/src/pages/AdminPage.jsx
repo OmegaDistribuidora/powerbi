@@ -21,6 +21,16 @@ const emptyCategory = {
   sortOrder: 0
 };
 
+const emptyHomeCard = {
+  title: "",
+  description: "",
+  imageUrl: "",
+  actionLabel: "",
+  actionUrl: "",
+  sortOrder: 0,
+  active: true
+};
+
 const emptyUser = {
   username: "",
   displayName: "",
@@ -33,6 +43,7 @@ const emptyUser = {
 };
 
 const adminSections = [
+  { id: "home", label: "Home inicial", singular: "card" },
   { id: "categories", label: "Categorias", singular: "categoria" },
   { id: "reports", label: "Paineis", singular: "painel" },
   { id: "users", label: "Usuarios", singular: "usuario" }
@@ -163,15 +174,19 @@ function Modal({ title, children, onClose }) {
 
 export default function AdminPage() {
   const { token } = useAuth();
+  const [homeCards, setHomeCards] = useState([]);
   const [users, setUsers] = useState([]);
   const [reports, setReports] = useState([]);
   const [categories, setCategories] = useState([]);
+  const [homeCardForm, setHomeCardForm] = useState(emptyHomeCard);
   const [userForm, setUserForm] = useState(emptyUser);
   const [reportForm, setReportForm] = useState(emptyReport);
   const [categoryForm, setCategoryForm] = useState(emptyCategory);
+  const [editingHomeCardId, setEditingHomeCardId] = useState(null);
   const [editingUserId, setEditingUserId] = useState(null);
   const [editingReportId, setEditingReportId] = useState(null);
   const [editingCategoryId, setEditingCategoryId] = useState(null);
+  const [homeCardModalOpen, setHomeCardModalOpen] = useState(false);
   const [userModalOpen, setUserModalOpen] = useState(false);
   const [reportModalOpen, setReportModalOpen] = useState(false);
   const [categoryModalOpen, setCategoryModalOpen] = useState(false);
@@ -180,11 +195,13 @@ export default function AdminPage() {
   const [notice, setNotice] = useState("");
 
   async function loadData() {
-    const [usersPayload, reportsPayload, categoriesPayload] = await Promise.all([
+    const [homeCardsPayload, usersPayload, reportsPayload, categoriesPayload] = await Promise.all([
+      apiJson("/home-cards", { token }),
       apiJson("/users", { token }),
       apiJson("/reports", { token }),
       apiJson("/report-categories", { token })
     ]);
+    setHomeCards(homeCardsPayload.cards);
     setUsers(usersPayload.users);
     setReports(reportsPayload.reports);
     setCategories(categoriesPayload.categories);
@@ -229,6 +246,9 @@ export default function AdminPage() {
   }
 
   function getSectionCount(sectionId) {
+    if (sectionId === "home") {
+      return homeCards.length;
+    }
     if (sectionId === "categories") {
       return categories.length;
     }
@@ -239,6 +259,10 @@ export default function AdminPage() {
   }
 
   function handleCreateForSection(sectionId) {
+    if (sectionId === "home") {
+      openNewHomeCardModal();
+      return;
+    }
     if (sectionId === "categories") {
       openNewCategoryModal();
       return;
@@ -285,6 +309,12 @@ export default function AdminPage() {
     setUserForm(emptyUser);
   }
 
+  function closeHomeCardModal() {
+    setHomeCardModalOpen(false);
+    setEditingHomeCardId(null);
+    setHomeCardForm(emptyHomeCard);
+  }
+
   function closeReportModal() {
     setReportModalOpen(false);
     setEditingReportId(null);
@@ -303,6 +333,14 @@ export default function AdminPage() {
     setEditingUserId(null);
     setUserForm(emptyUser);
     setUserModalOpen(true);
+  }
+
+  function openNewHomeCardModal() {
+    setError("");
+    setNotice("");
+    setEditingHomeCardId(null);
+    setHomeCardForm(emptyHomeCard);
+    setHomeCardModalOpen(true);
   }
 
   function openNewReportModal() {
@@ -384,6 +422,44 @@ export default function AdminPage() {
       await loadData();
       closeCategoryModal();
       setNotice("Categoria salva com sucesso.");
+    } catch (requestError) {
+      setError(requestError.message);
+    }
+  }
+
+  async function handleSaveHomeCard(event) {
+    event.preventDefault();
+    setError("");
+    setNotice("");
+
+    try {
+      const payload = {
+        title: homeCardForm.title.trim(),
+        description: homeCardForm.description.trim(),
+        imageUrl: homeCardForm.imageUrl.trim(),
+        actionLabel: homeCardForm.actionLabel.trim(),
+        actionUrl: homeCardForm.actionUrl.trim(),
+        sortOrder: Number(homeCardForm.sortOrder) || 0,
+        active: homeCardForm.active
+      };
+
+      if (editingHomeCardId) {
+        await apiJson(`/home-cards/${editingHomeCardId}`, {
+          token,
+          method: "PUT",
+          data: payload
+        });
+      } else {
+        await apiJson("/home-cards", {
+          token,
+          method: "POST",
+          data: payload
+        });
+      }
+
+      await loadData();
+      closeHomeCardModal();
+      setNotice("Card inicial salvo com sucesso.");
     } catch (requestError) {
       setError(requestError.message);
     }
@@ -524,6 +600,22 @@ export default function AdminPage() {
       }))
     });
     setUserModalOpen(true);
+  }
+
+  function startEditingHomeCard(card) {
+    setError("");
+    setNotice("");
+    setEditingHomeCardId(card.id);
+    setHomeCardForm({
+      title: card.title,
+      description: card.description || "",
+      imageUrl: card.imageUrl || "",
+      actionLabel: card.actionLabel || "",
+      actionUrl: card.actionUrl || "",
+      sortOrder: card.sortOrder ?? 0,
+      active: card.active
+    });
+    setHomeCardModalOpen(true);
   }
 
   function startEditingReport(report) {
@@ -944,6 +1036,55 @@ export default function AdminPage() {
           </aside>
 
           <div className="admin-section-panel">
+            {activeSection === "home" ? (
+              <>
+                <div className="header-line">
+                  <div>
+                    <h2>Home inicial</h2>
+                    <p className="muted small">Cards exibidos na pagina inicial dos usuarios.</p>
+                  </div>
+                  <span className="muted small">{homeCards.length} card(s)</span>
+                </div>
+                {!homeCards.length ? (
+                  <p className="muted">Nenhum card cadastrado.</p>
+                ) : (
+                  <div className="admin-row-list">
+                    {homeCards.map((card) => (
+                      <article key={card.id} className="admin-row-card admin-row-card-media">
+                        <div className="admin-row-media">
+                          {card.imageUrl ? <img src={card.imageUrl} alt={card.title} /> : <div className="admin-row-media-placeholder">Sem preview</div>}
+                        </div>
+                        <div className="admin-row-main">
+                          <div className="admin-row-title">
+                            <strong>{card.title}</strong>
+                            <span className={`status-dot ${card.active ? "is-success" : "is-muted"}`}>
+                              {card.active ? "Ativo" : "Inativo"}
+                            </span>
+                            <span className="muted small">Ordem {card.sortOrder}</span>
+                          </div>
+                          <div className="admin-row-meta">
+                            {card.description ? <span className="tag-chip tag-chip-wide">{card.description}</span> : null}
+                            {card.actionLabel ? <span className="tag-chip">{card.actionLabel}</span> : null}
+                            {card.actionUrl ? <span className="tag-chip tag-chip-accent">{card.actionUrl}</span> : null}
+                          </div>
+                        </div>
+                        <div className="admin-row-actions">
+                          <button
+                            type="button"
+                            className="icon-btn"
+                            onClick={() => startEditingHomeCard(card)}
+                            aria-label={`Editar card ${card.title}`}
+                          >
+                            <PencilIcon />
+                          </button>
+                        </div>
+                      </article>
+                    ))}
+                  </div>
+                )}
+              </>
+            ) : null}
+
             {activeSection === "categories" ? (
               <>
                 <div className="header-line">
@@ -1130,6 +1271,86 @@ export default function AdminPage() {
           </div>
         </div>
       </section>
+
+      {homeCardModalOpen ? (
+        <Modal title={editingHomeCardId ? "Editar card inicial" : "Novo card inicial"} onClose={closeHomeCardModal}>
+          <form className="form-stack" onSubmit={handleSaveHomeCard}>
+            <label>
+              Titulo
+              <input
+                value={homeCardForm.title}
+                onChange={(event) => setHomeCardForm({ ...homeCardForm, title: event.target.value })}
+                required
+              />
+            </label>
+
+            <label>
+              Descricao
+              <textarea
+                className="text-area-input"
+                value={homeCardForm.description}
+                onChange={(event) => setHomeCardForm({ ...homeCardForm, description: event.target.value })}
+                rows={4}
+              />
+            </label>
+
+            <label>
+              Imagem de preview
+              <input
+                value={homeCardForm.imageUrl}
+                onChange={(event) => setHomeCardForm({ ...homeCardForm, imageUrl: event.target.value })}
+                placeholder="https://..."
+              />
+            </label>
+
+            <label>
+              Texto do botao
+              <input
+                value={homeCardForm.actionLabel}
+                onChange={(event) => setHomeCardForm({ ...homeCardForm, actionLabel: event.target.value })}
+                placeholder="Saiba mais, Abrir..."
+              />
+            </label>
+
+            <label>
+              Link do botao
+              <input
+                value={homeCardForm.actionUrl}
+                onChange={(event) => setHomeCardForm({ ...homeCardForm, actionUrl: event.target.value })}
+                placeholder="/reports/1 ou https://..."
+              />
+            </label>
+
+            <label>
+              Ordem
+              <input
+                type="number"
+                min="0"
+                value={homeCardForm.sortOrder}
+                onChange={(event) => setHomeCardForm({ ...homeCardForm, sortOrder: event.target.value })}
+              />
+            </label>
+
+            <label className="check-row">
+              <input
+                type="checkbox"
+                checked={homeCardForm.active}
+                onChange={(event) => setHomeCardForm({ ...homeCardForm, active: event.target.checked })}
+              />
+              <span>Card ativo</span>
+            </label>
+
+            <div className="inline-actions">
+              <button type="submit" className="primary-btn">
+                Salvar card
+              </button>
+              <button type="button" className="secondary-btn" onClick={closeHomeCardModal}>
+                Cancelar
+              </button>
+            </div>
+          </form>
+        </Modal>
+      ) : null}
 
       {reportModalOpen ? (
         <Modal title={editingReportId ? "Editar painel" : "Novo painel"} onClose={closeReportModal}>

@@ -32,12 +32,14 @@ a {
 
 button,
 input,
-select {
+select,
+textarea {
   font: inherit;
 }
 
 input,
-select {
+select,
+textarea {
   width: 100%;
   margin-top: 6px;
   border-radius: 12px;
@@ -52,6 +54,10 @@ select option,
 select optgroup {
   color: var(--text);
   background: #13233f;
+}
+
+textarea {
+  resize: vertical;
 }
 
 fieldset {
@@ -165,6 +171,14 @@ label {
 .brand {
   font-size: 1.35rem;
   font-weight: 800;
+}
+
+.brand-link {
+  display: inline-block;
+}
+
+.brand-link:hover {
+  color: var(--accent-soft);
 }
 
 .nav-stack {
@@ -294,6 +308,66 @@ label {
 
 .cards-grid {
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.dashboard-card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 18px;
+}
+
+.dashboard-home-card {
+  overflow: hidden;
+  border-radius: 22px;
+  border: 1px solid rgba(133, 167, 255, 0.18);
+  background: rgba(255, 255, 255, 0.05);
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.2);
+  transition:
+    transform 0.22s ease,
+    border-color 0.22s ease,
+    box-shadow 0.22s ease,
+    background 0.22s ease;
+}
+
+.dashboard-home-card:hover {
+  transform: translateY(-4px) scale(1.01);
+  border-color: rgba(255, 123, 44, 0.4);
+  background: rgba(255, 255, 255, 0.08);
+  box-shadow: 0 20px 44px rgba(0, 0, 0, 0.26);
+}
+
+.dashboard-home-card-image {
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.dashboard-home-card-image img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.dashboard-home-card-body {
+  display: grid;
+  gap: 12px;
+  padding: 18px;
+}
+
+.dashboard-home-card-body h2 {
+  margin: 0;
+  font-size: 1.35rem;
+}
+
+.dashboard-home-card-body p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.dashboard-card-action {
+  justify-self: start;
 }
 
 .admin-grid {
@@ -512,6 +586,36 @@ label {
   background: rgba(255, 255, 255, 0.04);
 }
 
+.admin-row-card-media {
+  align-items: stretch;
+}
+
+.admin-row-media {
+  width: 124px;
+  height: 84px;
+  overflow: hidden;
+  border-radius: 14px;
+  border: 1px solid rgba(133, 167, 255, 0.12);
+  background: rgba(255, 255, 255, 0.04);
+  flex-shrink: 0;
+}
+
+.admin-row-media img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.admin-row-media-placeholder {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
 .admin-row-main {
   display: grid;
   gap: 8px;
@@ -564,6 +668,12 @@ label {
   background: rgba(255, 255, 255, 0.05);
   color: var(--text);
   font-size: 0.78rem;
+}
+
+.tag-chip-wide {
+  max-width: 100%;
+  border-radius: 14px;
+  white-space: normal;
 }
 
 .tag-chip-muted {
@@ -909,6 +1019,10 @@ label {
   padding: 4px;
   border-radius: 12px;
   cursor: pointer;
+}
+
+.text-area-input {
+  min-height: 108px;
 }
 
 .audit-list {

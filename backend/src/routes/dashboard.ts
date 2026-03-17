@@ -55,6 +55,11 @@ export async function registerDashboardRoutes(app: FastifyInstance): Promise<voi
             )
             .filter((report: { active: boolean }) => report.active);
 
+    const homeCards = await (prisma as any).homeCard.findMany({
+      where: { active: true },
+      orderBy: [{ sortOrder: "asc" }, { title: "asc" }]
+    });
+
     return {
       user: {
         id: user.id,
@@ -67,6 +72,16 @@ export async function registerDashboardRoutes(app: FastifyInstance): Promise<voi
         reportsCount: reports.length,
         filtersCount: user.filterRules.length
       },
+      homeCards: homeCards.map((card: any) => ({
+        id: card.id,
+        title: card.title,
+        description: card.description,
+        imageUrl: card.imageUrl,
+        actionLabel: card.actionLabel,
+        actionUrl: card.actionUrl,
+        sortOrder: card.sortOrder,
+        active: card.active
+      })),
       categories: (reports as Array<{ category?: { id: number; name: string; color: string; sortOrder: number } | null }>)
         .map(
           (report) => report.category
