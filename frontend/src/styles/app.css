@@ -188,17 +188,22 @@ label {
 }
 
 .brand {
-  font-size: 1.35rem;
+  font-size: 1.12rem;
   font-weight: 800;
 }
 
 .brand-link {
   display: inline-flex;
   align-items: center;
+  width: 100%;
 }
 
 .brand-link:hover {
   color: var(--accent-soft);
+}
+
+.brand-mark {
+  white-space: nowrap;
 }
 
 .nav-stack {
