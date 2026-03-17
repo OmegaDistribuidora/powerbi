@@ -56,7 +56,7 @@ function PasswordModal({ onClose, onSubmit, saving, error, success, isAdmin, use
         <form className="form-stack" onSubmit={handleSubmit}>
           {isAdmin ? (
             <label>
-              Usuario
+              Usuário
               <select
                 value={form.targetUserId}
                 onChange={(event) => updateField("targetUserId", Number(event.target.value))}
@@ -307,10 +307,10 @@ export default function AppLayout() {
           {user?.role === "ADMIN" ? (
             <>
               <NavLink to="/admin" className="nav-link">
-                Administracao
+                Administração
               </NavLink>
               <NavLink to="/mapping" className="nav-link">
-                Mapeamento de paineis
+                Mapeamento de painéis
               </NavLink>
               <NavLink to="/audit" className="nav-link">
                 Auditoria

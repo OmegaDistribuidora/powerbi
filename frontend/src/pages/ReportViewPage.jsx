@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { useParams } from "react-router-dom";
 import { useAuth } from "../components/AuthProvider";
 import { microsoftConfig } from "../config";
 import { apiJson } from "../services/api";
@@ -151,7 +151,7 @@ function formatPowerBiApiError(response, payload) {
     return `${statusLabel} - ${apiMessage}`;
   }
 
-  return `${statusLabel} - Nao foi possivel consultar o relatorio no Power BI.`;
+  return `${statusLabel} - Não foi possível consultar o relatório no Power BI.`;
 }
 
 async function fetchReportMetadata(report, accessToken) {
@@ -404,7 +404,7 @@ export default function ReportViewPage() {
               ? "Embed URL salva do painel foi usada diretamente."
               : metadata?.source === "fallback-embed-url"
                 ? `Consulta da API do Power BI falhou; usando Embed URL direta. ${metadata.warning}`
-                : "Metadata do relatorio carregada pela API do Power BI."
+                : "Metadata do relatório carregada pela API do Power BI."
           ]
         }));
 
@@ -473,10 +473,10 @@ export default function ReportViewPage() {
                 ...current.events,
                 filters.length
                   ? `setFilters executado com ${filters.length} filtro(s).`
-                  : "Nenhum filtro configurado para enviar ao relatorio.",
+                  : "Nenhum filtro configurado para enviar ao relatório.",
                 activePage
-                  ? `Filtros reaplicados tambem na pagina ativa: ${activePage.displayName || activePage.name}.`
-                  : "Nao foi possivel identificar a pagina ativa."
+                  ? `Filtros reaplicados também na página ativa: ${activePage.displayName || activePage.name}.`
+                  : "Não foi possível identificar a página ativa."
               ]
             }));
 
@@ -486,7 +486,7 @@ export default function ReportViewPage() {
           } catch (filterError) {
             if (!cancelled) {
               setEmbedStatus("error");
-              setEmbedError(`O relatorio abriu, mas os filtros nao puderam ser aplicados: ${filterError.message}`);
+              setEmbedError(`O relatório abriu, mas os filtros não puderam ser aplicados: ${filterError.message}`);
               setDiagnostics((current) => ({
                 ...current,
                 lastError: filterError.message,
@@ -509,7 +509,7 @@ export default function ReportViewPage() {
         embeddedReport.on("error", (event) => {
           if (!cancelled) {
             setEmbedStatus("error");
-            const eventMessage = event?.detail?.message || "Falha ao carregar o relatorio do Power BI.";
+            const eventMessage = event?.detail?.message || "Falha ao carregar o relatório do Power BI.";
             setEmbedError(eventMessage);
             setDiagnostics((current) => ({
               ...current,
@@ -523,12 +523,12 @@ export default function ReportViewPage() {
           setEmbedStatus("error");
           const authMessage =
             authError.message ||
-            "Nao foi possivel autenticar no Power BI. Verifique o app do Microsoft Entra e a permissao do usuario.";
+            "Não foi possível autenticar no Power BI. Verifique o app do Microsoft Entra e a permissão do usuário.";
           setEmbedError(authMessage);
           setDiagnostics((current) => ({
             ...current,
             lastError: authMessage,
-            events: [...current.events, `Erro de autenticacao: ${authMessage}`]
+            events: [...current.events, `Erro de autenticação: ${authMessage}`]
           }));
         }
       }
@@ -601,6 +601,7 @@ export default function ReportViewPage() {
   return (
     <div className="report-workspace">
       <section className="page-card report-main-card">
+        {embedError ? <p className="error-text">{embedError}</p> : null}
         {secureIframeMode ? (
           <div className="report-embed-frame report-embed-large secure-iframe-shell">
             <iframe
@@ -619,122 +620,12 @@ export default function ReportViewPage() {
           </div>
         ) : !embedUrl ? (
           <div className="embed-placeholder">
-            <p className="error-text">Este painel ainda nao tem configuracao suficiente para embed.</p>
+            <p className="error-text">Este painel ainda não tem configuração suficiente para embed.</p>
           </div>
         ) : (
           <div ref={containerRef} className="report-embed-frame report-embed-large" />
         )}
       </section>
-
-      <details className="page-card report-details-card">
-        <summary>Detalhes do painel</summary>
-
-        <section className="report-meta-card">
-          <div className="report-toolbar">
-            <div className="report-toolbar-left">
-              <Link to="/" className="inline-link">
-                &larr; Voltar
-              </Link>
-              <div className="report-title-block">
-                <div className="eyebrow">Painel</div>
-                <strong>{data.report.name}</strong>
-              </div>
-              <span className={`pill ${embedStatus === "rendered" || embedStatus === "loaded" ? "is-success" : "is-muted"}`}>
-                {embedStatus === "authenticating" && "Autenticando"}
-                {embedStatus === "loading" && "Carregando"}
-                {embedStatus === "loaded" && "Filtrando"}
-                {embedStatus === "rendered" && "Pronto"}
-                {embedStatus === "error" && "Erro"}
-                {embedStatus === "login-required" && "Login Microsoft"}
-                {(embedStatus === "idle" || embedStatus === "missing-config" || embedStatus === "needs-config") && "Aguardando"}
-              </span>
-            </div>
-            {!secureIframeMode && microsoftConfig.isConfigured ? (
-              <button type="button" className="ghost-btn compact-btn" onClick={handleReconnectMicrosoft}>
-                {microsoftAccount ? "Trocar conta Microsoft" : "Entrar com Microsoft"}
-              </button>
-            ) : null}
-          </div>
-
-          <div className="report-meta-line">
-            {!secureIframeMode ? (
-              <span className="muted small">
-                {microsoftAccount?.username ? `Conta Microsoft: ${microsoftAccount.username}` : "Nenhuma conta Microsoft conectada ainda."}
-              </span>
-            ) : null}
-            {!secureIframeMode && embedStatus === "login-required" ? (
-              <span className="muted small">
-                Clique em <strong>Entrar com Microsoft</strong> para autorizar o Power BI e carregar este painel.
-              </span>
-            ) : null}
-          </div>
-
-          {embedError ? <p className="error-text">{embedError}</p> : null}
-        </section>
-
-        <section className="report-support-grid">
-          <section className="side-panel-card">
-            <div className="eyebrow">Filtros</div>
-            {!data.filters.length ? (
-              <p className="muted">Nenhuma regra configurada para este usuario/painel.</p>
-            ) : (
-              <div className="rules-list">
-                {data.filters.map((rule) => (
-                  <div key={rule.id} className="rule-card">
-                    <strong>
-                      {rule.tableName}.{rule.columnName}
-                    </strong>
-                    <span>Valor: {rule.value}</span>
-                  </div>
-                ))}
-              </div>
-            )}
-          </section>
-
-          <section className="side-panel-card">
-            <div className="eyebrow">Configuracao</div>
-            <div className="side-meta-list">
-              <div>
-                <span className="muted small">Modo de exibicao</span>
-                <strong>{secureIframeMode ? "Secure iframe" : "Power BI Client"}</strong>
-              </div>
-            </div>
-          </section>
-
-          <section className="side-panel-card">
-            <details className="embed-details">
-              <summary>Diagnostico</summary>
-              {secureIframeMode ? (
-                <p className="muted small">O diagnostico detalhado so fica disponivel no modo Power BI Client.</p>
-              ) : null}
-              <div className="inline-actions">
-                <button type="button" className="secondary-btn" onClick={handleRefreshDiagnostics}>
-                  Atualizar
-                </button>
-              </div>
-              <div className="diagnostic-grid">
-                <div>
-                  <span className="muted small">Payload</span>
-                  <pre>{JSON.stringify(diagnostics.requestedFilters, null, 2)}</pre>
-                </div>
-                <div>
-                  <span className="muted small">Filtros ativos</span>
-                  <pre>{JSON.stringify(diagnostics.appliedFilters, null, 2)}</pre>
-                </div>
-                <div>
-                  <span className="muted small">Pagina ativa</span>
-                  <pre>{JSON.stringify(diagnostics.activePage, null, 2)}</pre>
-                </div>
-                <div>
-                  <span className="muted small">Filtros da pagina</span>
-                  <pre>{JSON.stringify(diagnostics.pageFilters, null, 2)}</pre>
-                </div>
-              </div>
-              {diagnostics.lastError ? <p className="error-text">Ultimo erro: {diagnostics.lastError}</p> : null}
-            </details>
-          </section>
-        </section>
-      </details>
     </div>
   );
 }

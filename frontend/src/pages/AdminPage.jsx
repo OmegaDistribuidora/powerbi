@@ -46,8 +46,8 @@ const emptyUser = {
 const adminSections = [
   { id: "home", label: "Home inicial", singular: "card" },
   { id: "categories", label: "Categorias", singular: "categoria" },
-  { id: "reports", label: "Paineis", singular: "painel" },
-  { id: "users", label: "Usuarios", singular: "usuario" }
+  { id: "reports", label: "Painéis", singular: "painel" },
+  { id: "users", label: "Usuários", singular: "usuário" }
 ];
 
 function blankRule() {
@@ -198,7 +198,7 @@ function Modal({ title, children, onClose }) {
       >
         <div className="modal-header">
           <div>
-            <div className="eyebrow">Administracao</div>
+            <div className="eyebrow">Administração</div>
             <h2>{title}</h2>
           </div>
           <button type="button" className="icon-btn" onClick={onClose} aria-label="Fechar">
@@ -233,6 +233,7 @@ export default function AdminPage() {
   const [categoryModalOpen, setCategoryModalOpen] = useState(false);
   const [activeSection, setActiveSection] = useState("categories");
   const [userProfileFilter, setUserProfileFilter] = useState("ALL");
+  const [reportCategoryFilter, setReportCategoryFilter] = useState("ALL");
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
 
@@ -329,6 +330,24 @@ export default function AdminPage() {
       });
   }, [reports]);
 
+  const reportCategoryOptions = useMemo(
+    () => reportsGroupedByCategory.map((group) => ({ key: group.key, label: group.label })),
+    [reportsGroupedByCategory]
+  );
+
+  const filteredReportsGroupedByCategory = useMemo(() => {
+    if (reportCategoryFilter === "ALL") {
+      return reportsGroupedByCategory;
+    }
+
+    return reportsGroupedByCategory.filter((group) => group.key === reportCategoryFilter);
+  }, [reportCategoryFilter, reportsGroupedByCategory]);
+
+  const filteredReportsCount = useMemo(
+    () => filteredReportsGroupedByCategory.reduce((total, group) => total + group.items.length, 0),
+    [filteredReportsGroupedByCategory]
+  );
+
   const filteredUsersForAdminSection = useMemo(() => {
     return users.filter((user) => {
       if (userProfileFilter === "ALL") {
@@ -346,6 +365,12 @@ export default function AdminPage() {
       setUserProfileFilter("ALL");
     }
   }, [userProfileFilter, userProfileOptions]);
+
+  useEffect(() => {
+    if (reportCategoryFilter !== "ALL" && !reportCategoryOptions.some((option) => option.key === reportCategoryFilter)) {
+      setReportCategoryFilter("ALL");
+    }
+  }, [reportCategoryFilter, reportCategoryOptions]);
 
   async function uploadHomeCardPreview(file) {
     const formData = new FormData();
@@ -632,7 +657,7 @@ export default function AdminPage() {
 
       await loadData();
       closeUserModal();
-      setNotice("Usuario salvo com sucesso.");
+      setNotice("Usuário salvo com sucesso.");
     } catch (requestError) {
       setError(requestError.message);
     }
@@ -1214,7 +1239,7 @@ export default function AdminPage() {
     setNotice("");
 
     const actionLabel = user.active ? "inativar" : "ativar";
-    if (!window.confirm(`Confirma ${actionLabel} o usuario "${user.displayName}"?`)) {
+    if (!window.confirm(`Confirma ${actionLabel} o usuário "${user.displayName}"?`)) {
       return;
     }
 
@@ -1239,7 +1264,7 @@ export default function AdminPage() {
         })
       });
       await loadData();
-      setNotice(`Usuario ${!user.active ? "ativado" : "inativado"} com sucesso.`);
+      setNotice(`Usuário ${!user.active ? "ativado" : "inativado"} com sucesso.`);
     } catch (requestError) {
       setError(requestError.message);
     }
@@ -1264,7 +1289,7 @@ export default function AdminPage() {
       });
       await loadData();
       closeHomeCardModal();
-      setNotice("Card excluido com sucesso.");
+      setNotice("Card excluído com sucesso.");
     } catch (requestError) {
       setError(requestError.message);
     }
@@ -1289,7 +1314,7 @@ export default function AdminPage() {
       });
       await loadData();
       closeReportModal();
-      setNotice("Painel excluido com sucesso.");
+      setNotice("Painel excluído com sucesso.");
     } catch (requestError) {
       setError(requestError.message);
     }
@@ -1300,7 +1325,7 @@ export default function AdminPage() {
       return;
     }
 
-    if (!window.confirm(`Confirma excluir o usuario "${userForm.displayName}"?`)) {
+    if (!window.confirm(`Confirma excluir o usuário "${userForm.displayName}"?`)) {
       return;
     }
 
@@ -1314,7 +1339,7 @@ export default function AdminPage() {
       });
       await loadData();
       closeUserModal();
-      setNotice("Usuario excluido com sucesso.");
+      setNotice("Usuário excluído com sucesso.");
     } catch (requestError) {
       setError(requestError.message);
     }
@@ -1325,8 +1350,8 @@ export default function AdminPage() {
       <section className="page-card admin-toolbar-card admin-toolbar-card-compact">
         <div className="header-line">
           <div className="admin-toolbar-copy">
-            <div className="eyebrow">Administracao</div>
-            <h1>Paineis, usuarios e categorias</h1>
+            <div className="eyebrow">Administração</div>
+            <h1>Painéis, usuários e categorias</h1>
           </div>
         </div>
 
@@ -1353,7 +1378,7 @@ export default function AdminPage() {
             </div>
 
             <div className="admin-side-create">
-              <div className="muted small">Acao rapida</div>
+              <div className="muted small">Ação rápida</div>
               <button
                 type="button"
                 className="primary-btn"
@@ -1370,7 +1395,7 @@ export default function AdminPage() {
                 <div className="header-line">
                   <div>
                     <h2>Home inicial</h2>
-                    <p className="muted small">Cards exibidos na pagina inicial dos usuarios.</p>
+                    <p className="muted small">Cards exibidos na página inicial dos usuários.</p>
                   </div>
                   <span className="muted small">{homeCards.length} card(s)</span>
                 </div>
@@ -1396,7 +1421,7 @@ export default function AdminPage() {
                               <span className="tag-chip tag-chip-wide">{shortenText(card.description, 96)}</span>
                             ) : null}
                             <span className="tag-chip tag-chip-muted">
-                              {(card.users || []).length} usuario(s)
+                              {(card.users || []).length} usuário(s)
                             </span>
                             {card.actionUrl ? (
                               <span className="tag-chip tag-chip-accent" title={card.actionUrl}>
@@ -1435,7 +1460,7 @@ export default function AdminPage() {
                 <div className="header-line">
                   <div>
                     <h2>Categorias</h2>
-                    <p className="muted small">Agrupe os paineis por tema e cor.</p>
+                    <p className="muted small">Agrupe os painéis por tema e cor.</p>
                   </div>
                   <span className="muted small">{categories.length} categoria(s)</span>
                 </div>
@@ -1485,16 +1510,29 @@ export default function AdminPage() {
               <>
                 <div className="header-line">
                   <div>
-                    <h2>Paineis</h2>
+                    <h2>Painéis</h2>
                     <p className="muted small">Agrupados por categoria para localizar e editar rapidamente.</p>
                   </div>
-                  <span className="muted small">{reports.length} painel(is)</span>
+                  <div className="header-inline-tools">
+                    <label className="inline-filter">
+                      <span className="muted small">Categoria</span>
+                      <select value={reportCategoryFilter} onChange={(event) => setReportCategoryFilter(event.target.value)}>
+                        <option value="ALL">Todas</option>
+                        {reportCategoryOptions.map((option) => (
+                          <option key={option.key} value={option.key}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <span className="muted small">{filteredReportsCount} painel(is)</span>
+                  </div>
                 </div>
-                {!reports.length ? (
+                {!filteredReportsCount ? (
                   <p className="muted">Nenhum painel cadastrado.</p>
                 ) : (
                   <div className="admin-row-list">
-                    {reportsGroupedByCategory.map((group) => (
+                    {filteredReportsGroupedByCategory.map((group) => (
                       <section key={group.key} className="admin-group-card">
                         <div className="admin-group-header">
                           <div className="admin-row-title">
@@ -1519,10 +1557,10 @@ export default function AdminPage() {
                                       {report.active ? "Ativo" : "Inativo"}
                                     </span>
                                     <span className="tag-chip tag-chip-muted">
-                                      {allowedUsers.length} usuario(s) com acesso
+                                      {allowedUsers.length} usuário(s) com acesso
                                     </span>
                                     <span className="tag-chip tag-chip-muted">
-                                      {(report.filterableFields || []).length} campo(s) filtraveis
+                                      {(report.filterableFields || []).length} campo(s) filtráveis
                                     </span>
                                   </div>
                                 </div>
@@ -1559,8 +1597,8 @@ export default function AdminPage() {
               <>
                 <div className="header-line">
                   <div>
-                    <h2>Usuarios</h2>
-                    <p className="muted small">Visualizacao densa para acompanhar todos os acessos.</p>
+                    <h2>Usuários</h2>
+                    <p className="muted small">Visualização densa para acompanhar todos os acessos.</p>
                   </div>
                   <div className="header-inline-tools">
                     <label className="inline-filter">
@@ -1574,11 +1612,11 @@ export default function AdminPage() {
                         ))}
                       </select>
                     </label>
-                    <span className="muted small">{filteredUsersForAdminSection.length} usuario(s)</span>
+                    <span className="muted small">{filteredUsersForAdminSection.length} usuário(s)</span>
                   </div>
                 </div>
                 {!filteredUsersForAdminSection.length ? (
-                  <p className="muted">Nenhum usuario cadastrado.</p>
+                  <p className="muted">Nenhum usuário cadastrado.</p>
                 ) : (
                   <div className="admin-row-list">
                     {filteredUsersForAdminSection.map((user) => {
@@ -1590,7 +1628,7 @@ export default function AdminPage() {
                               <strong>{user.displayName}</strong>
                               {user.role !== "ADMIN" ? <span className="tag-chip tag-chip-muted">{getUserProfileLabel(user)}</span> : null}
                               <span className="muted small">
-                                {user.username} · {user.role === "ADMIN" ? "Administrador" : "Usuario"}
+                                {user.username} · {user.role === "ADMIN" ? "Administrador" : "Usuário"}
                               </span>
                             </div>
                             <div className="admin-row-meta">
@@ -1607,7 +1645,7 @@ export default function AdminPage() {
                               type="button"
                               className="icon-btn"
                               onClick={() => toggleUserActive(user)}
-                              aria-label={`${user.active ? "Inativar" : "Ativar"} usuario ${user.displayName}`}
+                              aria-label={`${user.active ? "Inativar" : "Ativar"} usuário ${user.displayName}`}
                             >
                               <PowerIcon />
                             </button>
@@ -1615,7 +1653,7 @@ export default function AdminPage() {
                               type="button"
                               className="icon-btn"
                               onClick={() => startEditingUser(user)}
-                              aria-label={`Editar usuario ${user.displayName}`}
+                              aria-label={`Editar usuário ${user.displayName}`}
                             >
                               <PencilIcon />
                             </button>
@@ -1635,7 +1673,7 @@ export default function AdminPage() {
         <Modal title={editingHomeCardId ? "Editar card inicial" : "Novo card inicial"} onClose={closeHomeCardModal}>
           <form className="form-stack" onSubmit={handleSaveHomeCard}>
             <label>
-              Titulo
+              Título
               <input
                 value={homeCardForm.title}
                 onChange={(event) => setHomeCardForm({ ...homeCardForm, title: event.target.value })}
@@ -1644,7 +1682,7 @@ export default function AdminPage() {
             </label>
 
             <label>
-              Descricao
+              Descrição
               <textarea
                 className="text-area-input"
                 value={homeCardForm.description}
@@ -1697,7 +1735,7 @@ export default function AdminPage() {
             ) : null}
 
             <label>
-              Texto do botao
+              Texto do botão
               <input
                 value={homeCardForm.actionLabel}
                 onChange={(event) => setHomeCardForm({ ...homeCardForm, actionLabel: event.target.value })}
@@ -1706,7 +1744,7 @@ export default function AdminPage() {
             </label>
 
             <label>
-              Link do botao
+              Link do botão
               <input
                 value={homeCardForm.actionUrl}
                 onChange={(event) => setHomeCardForm({ ...homeCardForm, actionUrl: event.target.value })}
@@ -1734,7 +1772,7 @@ export default function AdminPage() {
             </label>
 
             <fieldset>
-              <legend>Usuarios com acesso</legend>
+              <legend>Usuários com acesso</legend>
               <div className="selection-group-grid">
                 {usersGroupedByProfile.map((group) => {
                   const allSelected = group.items.every((user) => homeCardForm.userIds.includes(user.id));
@@ -1806,7 +1844,7 @@ export default function AdminPage() {
             </label>
 
             <label>
-              Descricao
+              Descrição
               <input
                 value={reportForm.description}
                 onChange={(event) => setReportForm({ ...reportForm, description: event.target.value })}
@@ -1822,7 +1860,7 @@ export default function AdminPage() {
               />
             </label>
             <p className="muted small">
-              Use o link de Arquivo &gt; Inserir relatorio &gt; Site ou portal.
+              Use o link de Arquivo &gt; Inserir relatório &gt; Site ou portal.
             </p>
 
             <label>
@@ -1841,7 +1879,7 @@ export default function AdminPage() {
             </label>
 
             <fieldset>
-              <legend>Tabelas e colunas filtraveis</legend>
+              <legend>Tabelas e colunas filtráveis</legend>
               <div className="form-stack compact">
                 {reportForm.filterableFields.map((field, index) => (
                   <div key={field._key} className="rule-editor">
@@ -1861,13 +1899,13 @@ export default function AdminPage() {
                   </div>
                 ))}
                 <button type="button" className="secondary-btn" onClick={addFilterableField}>
-                  Adicionar campo filtravel
+                  Adicionar campo filtrável
                 </button>
               </div>
             </fieldset>
 
             <fieldset>
-              <legend>Distribuir painel para usuarios</legend>
+              <legend>Distribuir painel para usuários</legend>
               <div className="form-stack compact">
                 <div className="selection-group-grid">
                   {usersGroupedByProfile.map((group) => {
@@ -1969,7 +2007,7 @@ export default function AdminPage() {
                   })}
                 </div>
                 <p className="muted small">
-                  Ao salvar, o painel ja sera vinculado aos usuarios escolhidos com os filtros definidos aqui.
+                  Ao salvar, o painel já será vinculado aos usuários escolhidos com os filtros definidos aqui.
                 </p>
               </div>
             </fieldset>
@@ -2001,7 +2039,7 @@ export default function AdminPage() {
       ) : null}
 
       {userModalOpen ? (
-        <Modal title={editingUserId ? "Editar usuario" : "Novo usuario"} onClose={closeUserModal}>
+        <Modal title={editingUserId ? "Editar usuário" : "Novo usuário"} onClose={closeUserModal}>
           <form className="form-stack" onSubmit={handleSaveUser}>
             <label>
               Login
@@ -2013,7 +2051,7 @@ export default function AdminPage() {
             </label>
 
             <label>
-              Nome de exibicao
+              Nome de exibição
               <input
                 value={userForm.displayName}
                 onChange={(event) => setUserForm({ ...userForm, displayName: event.target.value })}
@@ -2022,7 +2060,7 @@ export default function AdminPage() {
             </label>
 
             <label>
-              Perfil de negocio
+              Perfil de negócio
               <input
                 value={userForm.profileLabel}
                 onChange={(event) => setUserForm({ ...userForm, profileLabel: event.target.value })}
@@ -2041,9 +2079,9 @@ export default function AdminPage() {
             </label>
 
             <label>
-              Permissao
+              Permissão
               <select value={userForm.role} onChange={(event) => setUserForm({ ...userForm, role: event.target.value })}>
-                <option value="USER">Usuario</option>
+                <option value="USER">Usuário</option>
                 <option value="ADMIN">Administrador</option>
               </select>
             </label>
@@ -2054,14 +2092,14 @@ export default function AdminPage() {
                 checked={userForm.active}
                 onChange={(event) => setUserForm({ ...userForm, active: event.target.checked })}
               />
-              <span>Usuario ativo</span>
+              <span>Usuário ativo</span>
             </label>
 
             {userForm.role === "ADMIN" ? (
-              <p className="muted small">Usuarios administradores nao recebem paineis vinculados.</p>
+              <p className="muted small">Usuários administradores não recebem painéis vinculados.</p>
             ) : (
               <fieldset>
-                <legend>Paineis liberados</legend>
+                <legend>Painéis liberados</legend>
                 <div className="selection-group-grid">
                   {reportsGroupedByCategory.map((group) => {
                     const groupReportIds = group.items.map((report) => report.id);
@@ -2116,7 +2154,7 @@ export default function AdminPage() {
                           })
                         }
                       >
-                        <option value="">Todos os paineis selecionados</option>
+                        <option value="">Todos os painéis selecionados</option>
                         {reports
                           .filter((report) => userForm.reportIds.includes(report.id))
                           .map((report) => (
@@ -2130,7 +2168,7 @@ export default function AdminPage() {
                         onChange={(event) => updateFilterRule(index, { tableName: event.target.value })}
                         disabled={!tables.length}
                       >
-                        <option value="">{tables.length ? "Selecione a tabela" : "Sem tabelas disponiveis"}</option>
+                        <option value="">{tables.length ? "Selecione a tabela" : "Sem tabelas disponíveis"}</option>
                         {tables.map((tableName) => (
                           <option key={tableName} value={tableName}>
                             {tableName}
@@ -2142,7 +2180,7 @@ export default function AdminPage() {
                         onChange={(event) => updateFilterRule(index, { columnName: event.target.value })}
                         disabled={!rule.tableName || !columns.length}
                       >
-                        <option value="">{columns.length ? "Selecione a coluna" : "Sem colunas disponiveis"}</option>
+                        <option value="">{columns.length ? "Selecione a coluna" : "Sem colunas disponíveis"}</option>
                         {columns.map((columnName) => (
                           <option key={columnName} value={columnName}>
                             {columnName}
@@ -2165,14 +2203,14 @@ export default function AdminPage() {
                   Adicionar regra
                 </button>
                 <p className="muted small">
-                  As tabelas e colunas disponiveis aqui sao definidas no cadastro do painel.
+                  As tabelas e colunas disponíveis aqui são definidas no cadastro do painel.
                 </p>
               </div>
             </fieldset>
 
             <div className="inline-actions">
               <button type="submit" className="primary-btn">
-                Salvar usuario
+                Salvar usuário
               </button>
               <button type="button" className="secondary-btn" onClick={closeUserModal}>
                 Cancelar
@@ -2200,7 +2238,7 @@ export default function AdminPage() {
             </label>
 
             <label>
-              Cor do titulo
+              Cor do título
               <div className="color-picker-row">
                 <span className="color-swatch color-swatch-lg" style={{ background: categoryForm.color }} />
                 <input

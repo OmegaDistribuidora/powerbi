@@ -177,7 +177,7 @@ function buildChangedPair(before, after) {
 
 function AuditDetailsModal({ log, onClose }) {
   const showBefore = shouldShowBefore(log);
-  const afterLabel = isViewReportEvent(log) ? "Detalhes da visualizacao" : "Novo valor";
+  const afterLabel = isViewReportEvent(log) ? "Detalhes da visualização" : "Novo valor";
   const changedPair = showBefore ? buildChangedPair(log.before, log.after) : null;
   const resolvedBefore = changedPair?.before ?? null;
   const resolvedAfter = changedPair?.after ?? log.after;
@@ -208,11 +208,11 @@ function AuditDetailsModal({ log, onClose }) {
             <strong>{formatAuditDate(log.createdAt)}</strong>
           </div>
           <div className="audit-meta-item">
-            <span className="muted small">Usuario:</span>
+            <span className="muted small">Usuário:</span>
             <strong>{log.actorDisplayName || log.actorUsername || "Sistema"}</strong>
           </div>
           <div className="audit-meta-item">
-            <span className="muted small">Acao:</span>
+            <span className="muted small">Ação:</span>
             <strong>{log.action}</strong>
           </div>
           <div className="audit-meta-item">
@@ -233,7 +233,7 @@ function AuditDetailsModal({ log, onClose }) {
             <pre>
               {hasRelevantChanges
                 ? JSON.stringify(resolvedAfter, null, 2)
-                : "Nenhuma alteracao relevante foi detectada entre o valor anterior e o novo valor."}
+                : "Nenhuma alteração relevante foi detectada entre o valor anterior e o novo valor."}
             </pre>
           </div>
         </div>
@@ -272,7 +272,7 @@ function AuditList({ logs, emptyMessage, showInspect }) {
                 type="button"
                 className="icon-btn"
                 onClick={() => showInspect(log)}
-                aria-label={`Ver detalhes da acao ${log.summary}`}
+                aria-label={`Ver detalhes da ação ${log.summary}`}
               >
                 <EyeIcon />
               </button>
@@ -324,12 +324,12 @@ export default function AuditPage() {
         <div className="header-line">
           <div className="admin-toolbar-copy">
             <div className="eyebrow">Auditoria</div>
-            <h1>Historico completo de acoes</h1>
+            <h1>Histórico completo de ações</h1>
           </div>
           <select className="audit-period-select" value={period} onChange={(event) => setPeriod(event.target.value)}>
             <option value="today">Hoje</option>
             <option value="week">Semana</option>
-            <option value="month">Mes</option>
+            <option value="month">Mês</option>
           </select>
         </div>
       </section>
@@ -340,15 +340,15 @@ export default function AuditPage() {
             <h2>Logins</h2>
             <span className="muted small">{loginLogs.length} registro(s)</span>
           </div>
-          <AuditList logs={loginLogs} emptyMessage="Nenhum login auditado neste periodo." />
+          <AuditList logs={loginLogs} emptyMessage="Nenhum login auditado neste período." />
         </article>
 
         <article className="page-card">
           <div className="header-line">
-            <h2>Acoes</h2>
+            <h2>Ações</h2>
             <span className="muted small">{otherLogs.length} registro(s)</span>
           </div>
-          <AuditList logs={otherLogs} emptyMessage="Nenhuma acao auditada neste periodo." showInspect={setSelectedLog} />
+          <AuditList logs={otherLogs} emptyMessage="Nenhuma ação auditada neste período." showInspect={setSelectedLog} />
         </article>
       </section>
 

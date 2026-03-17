@@ -129,7 +129,7 @@ export default function MappingPage() {
         <div className="header-line">
           <div className="admin-toolbar-copy">
             <div className="eyebrow">Mapeamento</div>
-            <h1>Mapeamento de paineis</h1>
+            <h1>Mapeamento de painéis</h1>
           </div>
           {selectedNodeId ? (
             <button type="button" className="secondary-btn" onClick={() => setSelectedNodeId("")}>
@@ -143,11 +143,11 @@ export default function MappingPage() {
         <div className="mapping-legend">
           <span className="mapping-legend-chip is-category">Categoria</span>
           <span className="mapping-legend-chip is-report">Painel</span>
-          <span className="mapping-legend-chip is-user">Usuario</span>
+          <span className="mapping-legend-chip is-user">Usuário</span>
         </div>
 
         <div className="mapping-scroll">
-          <svg className="mapping-canvas" viewBox="0 0 980 980" role="img" aria-label="Mapeamento de categorias, paineis e usuarios">
+          <svg className="mapping-canvas" viewBox="0 0 980 980" role="img" aria-label="Mapeamento de categorias, painéis e usuários">
             {edges.map((edge) => {
               const from = nodes.find((node) => node.id === edge.from);
               const to = nodes.find((node) => node.id === edge.to);
