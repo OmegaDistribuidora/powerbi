@@ -178,6 +178,14 @@ function summarizeLink(value) {
   }
 }
 
+function getUserProfileLabel(user) {
+  return String(user?.profileLabel || "").trim() || "Sem perfil";
+}
+
+function getReportCategoryLabel(report) {
+  return report?.category?.name || "Sem categoria";
+}
+
 function Modal({ title, children, onClose }) {
   return (
     <div className="modal-backdrop" role="presentation" onClick={onClose}>
@@ -224,6 +232,7 @@ export default function AdminPage() {
   const [reportModalOpen, setReportModalOpen] = useState(false);
   const [categoryModalOpen, setCategoryModalOpen] = useState(false);
   const [activeSection, setActiveSection] = useState("categories");
+  const [userProfileFilter, setUserProfileFilter] = useState("ALL");
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
 
@@ -246,7 +255,7 @@ export default function AdminPage() {
 
   const reportUsersMap = useMemo(() => {
     return reports.reduce((accumulator, report) => {
-      accumulator[report.id] = users.filter((user) => user.reportIds.includes(report.id));
+      accumulator[report.id] = users.filter((user) => user.role !== "ADMIN" && user.reportIds.includes(report.id));
       return accumulator;
     }, {});
   }, [reports, users]);
@@ -260,9 +269,83 @@ export default function AdminPage() {
 
   const assignableUsers = useMemo(() => {
     return users
-      .filter((user) => user.active)
+      .filter((user) => user.active && user.role !== "ADMIN")
       .sort((a, b) => a.displayName.localeCompare(b.displayName));
   }, [users]);
+
+  const userProfileOptions = useMemo(() => {
+    return Array.from(
+      new Set(
+        users
+          .filter((user) => user.role !== "ADMIN")
+          .map((user) => getUserProfileLabel(user))
+      )
+    ).sort((a, b) => a.localeCompare(b));
+  }, [users]);
+
+  const usersGroupedByProfile = useMemo(() => {
+    const groups = new Map();
+    assignableUsers.forEach((user) => {
+      const key = getUserProfileLabel(user);
+      if (!groups.has(key)) {
+        groups.set(key, []);
+      }
+      groups.get(key).push(user);
+    });
+    return Array.from(groups.entries())
+      .map(([label, items]) => ({
+        label,
+        items: items.sort((a, b) => a.displayName.localeCompare(b.displayName))
+      }))
+      .sort((a, b) => a.label.localeCompare(b.label));
+  }, [assignableUsers]);
+
+  const reportsGroupedByCategory = useMemo(() => {
+    const groups = new Map();
+    reports.forEach((report) => {
+      const key = report.category?.id ? `category-${report.category.id}` : "uncategorized";
+      if (!groups.has(key)) {
+        groups.set(key, {
+          key,
+          label: getReportCategoryLabel(report),
+          color: report.category?.color || "",
+          sortOrder: report.category?.sortOrder ?? Number.MAX_SAFE_INTEGER,
+          items: []
+        });
+      }
+      groups.get(key).items.push(report);
+    });
+
+    return Array.from(groups.values())
+      .map((group) => ({
+        ...group,
+        items: group.items.sort((a, b) => a.name.localeCompare(b.name))
+      }))
+      .sort((a, b) => {
+        if (a.sortOrder !== b.sortOrder) {
+          return a.sortOrder - b.sortOrder;
+        }
+        return a.label.localeCompare(b.label);
+      });
+  }, [reports]);
+
+  const filteredUsersForAdminSection = useMemo(() => {
+    return users.filter((user) => {
+      if (userProfileFilter === "ALL") {
+        return true;
+      }
+      if (user.role === "ADMIN") {
+        return false;
+      }
+      return getUserProfileLabel(user) === userProfileFilter;
+    });
+  }, [userProfileFilter, users]);
+
+  useEffect(() => {
+    if (userProfileFilter !== "ALL" && !userProfileOptions.includes(userProfileFilter)) {
+      setUserProfileFilter("ALL");
+    }
+  }, [userProfileFilter, userProfileOptions]);
 
   async function uploadHomeCardPreview(file) {
     const formData = new FormData();
@@ -285,6 +368,9 @@ export default function AdminPage() {
   }
 
   function reportNamesForUser(user) {
+    if (user.role === "ADMIN") {
+      return [];
+    }
     return reports.filter((report) => user.reportIds.includes(report.id)).map((report) => report.name);
   }
 
@@ -577,6 +663,33 @@ export default function AdminPage() {
     });
   }
 
+  function toggleUserReportGroup(reportIds, enabled) {
+    setUserForm((current) => {
+      const targetIds = reportIds.map(Number);
+      const nextReportIds = enabled
+        ? Array.from(new Set([...current.reportIds, ...targetIds]))
+        : current.reportIds.filter((id) => !targetIds.includes(id));
+
+      const nextRules = current.filterRules.map((rule) => {
+        if (!rule.reportId) {
+          const fields = nextReportIds.flatMap((id) => reportFieldMap[id] || []);
+          const stillValid = fields.some(
+            (field) => field.tableName === rule.tableName && field.columnName === rule.columnName
+          );
+          return stillValid ? rule : { ...rule, tableName: "", columnName: "" };
+        }
+
+        return nextReportIds.includes(rule.reportId) ? rule : { ...rule, reportId: null, tableName: "", columnName: "" };
+      });
+
+      return {
+        ...current,
+        reportIds: nextReportIds,
+        filterRules: nextRules
+      };
+    });
+  }
+
   function updateFilterRule(index, patch) {
     setUserForm((current) => ({
       ...current,
@@ -683,8 +796,9 @@ export default function AdminPage() {
     const reportAssignments = users
       .filter(
         (user) =>
-          user.reportIds.includes(report.id) ||
-          (user.filterRules || []).some((rule) => rule.reportId === report.id)
+          user.role !== "ADMIN" &&
+          (user.reportIds.includes(report.id) ||
+            (user.filterRules || []).some((rule) => rule.reportId === report.id))
       )
       .map((user) => ({
         _key: crypto.randomUUID(),
@@ -805,6 +919,48 @@ export default function AdminPage() {
       return {
         ...current,
         userAssignments: currentAssignments.filter((_, assignmentIndex) => assignmentIndex !== existingIndex)
+      };
+    });
+  }
+
+  function toggleReportAssignmentGroup(groupUsers, enabled) {
+    setReportForm((current) => {
+      const currentAssignments = current.userAssignments || [];
+      const groupUserIds = groupUsers.map((user) => user.id);
+
+      if (enabled) {
+        const existingIds = new Set(currentAssignments.map((assignment) => Number(assignment.userId)));
+        const additions = groupUserIds
+          .filter((userId) => !existingIds.has(userId))
+          .map((userId) => ({
+            _key: crypto.randomUUID(),
+            userId: String(userId),
+            filterRules: []
+          }));
+
+        return {
+          ...current,
+          userAssignments: [...currentAssignments, ...additions]
+        };
+      }
+
+      return {
+        ...current,
+        userAssignments: currentAssignments.filter(
+          (assignment) => !groupUserIds.includes(Number(assignment.userId))
+        )
+      };
+    });
+  }
+
+  function toggleHomeCardUserGroup(groupUsers, enabled) {
+    setHomeCardForm((current) => {
+      const groupUserIds = groupUsers.map((user) => user.id);
+      return {
+        ...current,
+        userIds: enabled
+          ? Array.from(new Set([...current.userIds, ...groupUserIds]))
+          : current.userIds.filter((userId) => !groupUserIds.includes(userId))
       };
     });
   }
@@ -969,6 +1125,14 @@ export default function AdminPage() {
   }
 
   function buildUserPayload(form) {
+    if (form.role === "ADMIN") {
+      return {
+        ...form,
+        reportIds: [],
+        filterRules: []
+      };
+    }
+
     return {
       ...form,
       filterRules: form.filterRules
@@ -1211,7 +1375,7 @@ export default function AdminPage() {
                 <div className="header-line">
                   <div>
                     <h2>Paineis</h2>
-                    <p className="muted small">Lista compacta para localizar e editar rapidamente.</p>
+                    <p className="muted small">Agrupados por categoria para localizar e editar rapidamente.</p>
                   </div>
                   <span className="muted small">{reports.length} painel(is)</span>
                 </div>
@@ -1219,56 +1383,62 @@ export default function AdminPage() {
                   <p className="muted">Nenhum painel cadastrado.</p>
                 ) : (
                   <div className="admin-row-list">
-                    {reports.map((report) => {
-                      const allowedUsers = reportUsersMap[report.id] || [];
-                      return (
-                        <article key={report.id} className="admin-row-card">
-                          <div className="admin-row-main">
-                            <div className="admin-row-title">
-                              <strong>{report.name}</strong>
-                              <span className="muted small">{report.category?.name || "Sem categoria"}</span>
-                            </div>
-                            <div className="admin-row-meta">
-                              <span className={`status-dot ${report.active ? "is-success" : "is-muted"}`}>
-                                {report.active ? "Ativo" : "Inativo"}
-                              </span>
-                              {allowedUsers.length ? (
-                                allowedUsers.slice(0, 8).map((user) => (
-                                  <span key={user.id} className="tag-chip">
-                                    {user.displayName}
-                                  </span>
-                                ))
-                              ) : (
-                                <span className="tag-chip tag-chip-muted">Sem usuarios</span>
-                              )}
-                              {(report.filterableFields || []).slice(0, 5).map((field) => (
-                                <span key={`${report.id}-${field.tableName}-${field.columnName}`} className="tag-chip tag-chip-accent">
-                                  {field.tableName}.{field.columnName}
-                                </span>
-                              ))}
-                            </div>
+                    {reportsGroupedByCategory.map((group) => (
+                      <section key={group.key} className="admin-group-card">
+                        <div className="admin-group-header">
+                          <div className="admin-row-title">
+                            {group.color ? <span className="color-swatch" style={{ background: group.color }} /> : null}
+                            <strong className="category-title-inline" style={group.color ? { color: group.color } : undefined}>
+                              {group.label}
+                            </strong>
                           </div>
-                          <div className="admin-row-actions">
-                            <button
-                              type="button"
-                              className="icon-btn"
-                              onClick={() => toggleReportActive(report)}
-                              aria-label={`${report.active ? "Inativar" : "Ativar"} painel ${report.name}`}
-                            >
-                              <PowerIcon />
-                            </button>
-                            <button
-                              type="button"
-                              className="icon-btn"
-                              onClick={() => startEditingReport(report)}
-                              aria-label={`Editar painel ${report.name}`}
-                            >
-                              <PencilIcon />
-                            </button>
-                          </div>
-                        </article>
-                      );
-                    })}
+                          <span className="tag-chip tag-chip-muted">{group.items.length} painel(is)</span>
+                        </div>
+                        <div className="admin-row-list">
+                          {group.items.map((report) => {
+                            const allowedUsers = reportUsersMap[report.id] || [];
+                            return (
+                              <article key={report.id} className="admin-row-card">
+                                <div className="admin-row-main">
+                                  <div className="admin-row-title">
+                                    <strong>{report.name}</strong>
+                                  </div>
+                                  <div className="admin-row-meta">
+                                    <span className={`status-dot ${report.active ? "is-success" : "is-muted"}`}>
+                                      {report.active ? "Ativo" : "Inativo"}
+                                    </span>
+                                    <span className="tag-chip tag-chip-muted">
+                                      {allowedUsers.length} usuario(s) com acesso
+                                    </span>
+                                    <span className="tag-chip tag-chip-muted">
+                                      {(report.filterableFields || []).length} campo(s) filtraveis
+                                    </span>
+                                  </div>
+                                </div>
+                                <div className="admin-row-actions">
+                                  <button
+                                    type="button"
+                                    className="icon-btn"
+                                    onClick={() => toggleReportActive(report)}
+                                    aria-label={`${report.active ? "Inativar" : "Ativar"} painel ${report.name}`}
+                                  >
+                                    <PowerIcon />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className="icon-btn"
+                                    onClick={() => startEditingReport(report)}
+                                    aria-label={`Editar painel ${report.name}`}
+                                  >
+                                    <PencilIcon />
+                                  </button>
+                                </div>
+                              </article>
+                            );
+                          })}
+                        </div>
+                      </section>
+                    ))}
                   </div>
                 )}
               </>
@@ -1281,19 +1451,33 @@ export default function AdminPage() {
                     <h2>Usuarios</h2>
                     <p className="muted small">Visualizacao densa para acompanhar todos os acessos.</p>
                   </div>
-                  <span className="muted small">{users.length} usuario(s)</span>
+                  <div className="header-inline-tools">
+                    <label className="inline-filter">
+                      <span className="muted small">Perfil</span>
+                      <select value={userProfileFilter} onChange={(event) => setUserProfileFilter(event.target.value)}>
+                        <option value="ALL">Todos</option>
+                        {userProfileOptions.map((profileLabel) => (
+                          <option key={profileLabel} value={profileLabel}>
+                            {profileLabel}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <span className="muted small">{filteredUsersForAdminSection.length} usuario(s)</span>
+                  </div>
                 </div>
-                {!users.length ? (
+                {!filteredUsersForAdminSection.length ? (
                   <p className="muted">Nenhum usuario cadastrado.</p>
                 ) : (
                   <div className="admin-row-list">
-                    {users.map((user) => {
+                    {filteredUsersForAdminSection.map((user) => {
                       const availableReports = reportNamesForUser(user);
                       return (
                         <article key={user.id} className="admin-row-card">
                           <div className="admin-row-main">
                             <div className="admin-row-title">
                               <strong>{user.displayName}</strong>
+                              {user.role !== "ADMIN" ? <span className="tag-chip tag-chip-muted">{getUserProfileLabel(user)}</span> : null}
                               <span className="muted small">
                                 {user.username} · {user.role === "ADMIN" ? "Administrador" : "Usuario"}
                               </span>
@@ -1302,15 +1486,9 @@ export default function AdminPage() {
                               <span className={`status-dot ${user.active ? "is-success" : "is-muted"}`}>
                                 {user.active ? "Ativo" : "Inativo"}
                               </span>
-                              {availableReports.length ? (
-                                availableReports.slice(0, 8).map((reportName) => (
-                                  <span key={`${user.id}-${reportName}`} className="tag-chip">
-                                    {reportName}
-                                  </span>
-                                ))
-                              ) : (
-                                <span className="tag-chip tag-chip-muted">Sem paineis</span>
-                              )}
+                              <span className="tag-chip tag-chip-muted">
+                                {availableReports.length} painel(is) com acesso
+                              </span>
                             </div>
                           </div>
                           <div className="admin-row-actions">
@@ -1446,24 +1624,44 @@ export default function AdminPage() {
 
             <fieldset>
               <legend>Usuarios com acesso</legend>
-              <div className="check-grid">
-                {assignableUsers.map((user) => (
-                  <label key={user.id} className="check-row">
-                    <input
-                      type="checkbox"
-                      checked={homeCardForm.userIds.includes(user.id)}
-                      onChange={(event) =>
-                        setHomeCardForm((current) => ({
-                          ...current,
-                          userIds: event.target.checked
-                            ? Array.from(new Set([...current.userIds, user.id]))
-                            : current.userIds.filter((currentUserId) => currentUserId !== user.id)
-                        }))
-                      }
-                    />
-                    <span>{user.displayName}</span>
-                  </label>
-                ))}
+              <div className="selection-group-grid">
+                {usersGroupedByProfile.map((group) => {
+                  const allSelected = group.items.every((user) => homeCardForm.userIds.includes(user.id));
+                  return (
+                    <section key={group.label} className="selection-group-card">
+                      <label className="selection-group-header">
+                        <span>{group.label}</span>
+                        <span className="selection-group-check">
+                          <input
+                            type="checkbox"
+                            checked={allSelected}
+                            onChange={(event) => toggleHomeCardUserGroup(group.items, event.target.checked)}
+                          />
+                          <span>Marcar todos</span>
+                        </span>
+                      </label>
+                      <div className="check-grid">
+                        {group.items.map((user) => (
+                          <label key={user.id} className="check-row">
+                            <input
+                              type="checkbox"
+                              checked={homeCardForm.userIds.includes(user.id)}
+                              onChange={(event) =>
+                                setHomeCardForm((current) => ({
+                                  ...current,
+                                  userIds: event.target.checked
+                                    ? Array.from(new Set([...current.userIds, user.id]))
+                                    : current.userIds.filter((currentUserId) => currentUserId !== user.id)
+                                }))
+                              }
+                            />
+                            <span>{user.displayName}</span>
+                          </label>
+                        ))}
+                      </div>
+                    </section>
+                  );
+                })}
               </div>
             </fieldset>
 
@@ -1555,78 +1753,102 @@ export default function AdminPage() {
             <fieldset>
               <legend>Distribuir painel para usuarios</legend>
               <div className="form-stack compact">
-                <div className="assignment-user-grid">
-                  {assignableUsers.map((user) => {
-                    const assignmentIndex = (reportForm.userAssignments || []).findIndex(
-                      (assignment) => Number(assignment.userId) === user.id
+                <div className="selection-group-grid">
+                  {usersGroupedByProfile.map((group) => {
+                    const allSelected = group.items.every((user) =>
+                      (reportForm.userAssignments || []).some((assignment) => Number(assignment.userId) === user.id)
                     );
-                    const assignment = assignmentIndex >= 0 ? reportForm.userAssignments[assignmentIndex] : null;
-                    const availableFields = availableReportAssignmentFields();
 
                     return (
-                      <article
-                        key={user.id}
-                        className={`assignment-user-card ${assignment ? "is-selected" : ""}`}
-                      >
-                        <label className="check-row assignment-user-toggle">
-                          <input
-                            type="checkbox"
-                            checked={Boolean(assignment)}
-                            onChange={(event) => toggleReportAssignmentForUser(user.id, event.target.checked)}
-                          />
-                          <span>{user.displayName}</span>
+                      <section key={group.label} className="selection-group-card">
+                        <label className="selection-group-header">
+                          <span>{group.label}</span>
+                          <span className="selection-group-check">
+                            <input
+                              type="checkbox"
+                              checked={allSelected}
+                              onChange={(event) => toggleReportAssignmentGroup(group.items, event.target.checked)}
+                            />
+                            <span>Marcar todos</span>
+                          </span>
                         </label>
 
-                        {assignment ? (
-                          <div className="form-stack compact">
-                            {assignment.filterRules.map((rule, ruleIndex) => (
-                              <div key={rule._key} className="assignment-rule-row">
-                                <select
-                                  value={rule.fieldKey}
-                                  onChange={(event) =>
-                                    updateAssignmentRule(assignmentIndex, ruleIndex, {
-                                      fieldKey: event.target.value
-                                    })
-                                  }
-                                >
-                                  <option value="">
-                                    {availableFields.length ? "Selecione o campo" : "Cadastre campos acima"}
-                                  </option>
-                                  {availableFields.map((field) => (
-                                    <option key={field.key} value={field.key}>
-                                      {field.tableName}.{field.columnName}
-                                    </option>
-                                  ))}
-                                </select>
-                                <input
-                                  placeholder="Valor do filtro"
-                                  value={rule.value}
-                                  onChange={(event) =>
-                                    updateAssignmentRule(assignmentIndex, ruleIndex, {
-                                      value: event.target.value
-                                    })
-                                  }
-                                />
-                                <button
-                                  type="button"
-                                  className="secondary-btn"
-                                  onClick={() => removeAssignmentRule(assignmentIndex, ruleIndex)}
-                                >
-                                  Remover
-                                </button>
-                              </div>
-                            ))}
+                        <div className="assignment-user-grid">
+                          {group.items.map((user) => {
+                            const assignmentIndex = (reportForm.userAssignments || []).findIndex(
+                              (assignment) => Number(assignment.userId) === user.id
+                            );
+                            const assignment = assignmentIndex >= 0 ? reportForm.userAssignments[assignmentIndex] : null;
+                            const availableFields = availableReportAssignmentFields();
 
-                            <button
-                              type="button"
-                              className="secondary-btn"
-                              onClick={() => addAssignmentRule(assignmentIndex)}
-                            >
-                              Adicionar filtro
-                            </button>
-                          </div>
-                        ) : null}
-                      </article>
+                            return (
+                              <article
+                                key={user.id}
+                                className={`assignment-user-card ${assignment ? "is-selected" : ""}`}
+                              >
+                                <label className="check-row assignment-user-toggle">
+                                  <input
+                                    type="checkbox"
+                                    checked={Boolean(assignment)}
+                                    onChange={(event) => toggleReportAssignmentForUser(user.id, event.target.checked)}
+                                  />
+                                  <span>{user.displayName}</span>
+                                </label>
+
+                                {assignment ? (
+                                  <div className="form-stack compact">
+                                    {assignment.filterRules.map((rule, ruleIndex) => (
+                                      <div key={rule._key} className="assignment-rule-row">
+                                        <select
+                                          value={rule.fieldKey}
+                                          onChange={(event) =>
+                                            updateAssignmentRule(assignmentIndex, ruleIndex, {
+                                              fieldKey: event.target.value
+                                            })
+                                          }
+                                        >
+                                          <option value="">
+                                            {availableFields.length ? "Selecione o campo" : "Cadastre campos acima"}
+                                          </option>
+                                          {availableFields.map((field) => (
+                                            <option key={field.key} value={field.key}>
+                                              {field.tableName}.{field.columnName}
+                                            </option>
+                                          ))}
+                                        </select>
+                                        <input
+                                          placeholder="Valor do filtro"
+                                          value={rule.value}
+                                          onChange={(event) =>
+                                            updateAssignmentRule(assignmentIndex, ruleIndex, {
+                                              value: event.target.value
+                                            })
+                                          }
+                                        />
+                                        <button
+                                          type="button"
+                                          className="secondary-btn"
+                                          onClick={() => removeAssignmentRule(assignmentIndex, ruleIndex)}
+                                        >
+                                          Remover
+                                        </button>
+                                      </div>
+                                    ))}
+
+                                    <button
+                                      type="button"
+                                      className="secondary-btn"
+                                      onClick={() => addAssignmentRule(assignmentIndex)}
+                                    >
+                                      Adicionar filtro
+                                    </button>
+                                  </div>
+                                ) : null}
+                              </article>
+                            );
+                          })}
+                        </div>
+                      </section>
                     );
                   })}
                 </div>
@@ -1714,21 +1936,48 @@ export default function AdminPage() {
               <span>Usuario ativo</span>
             </label>
 
-            <fieldset>
-              <legend>Paineis liberados</legend>
-              <div className="check-grid">
-                {reports.map((report) => (
-                  <label key={report.id} className="check-row">
-                    <input
-                      type="checkbox"
-                      checked={userForm.reportIds.includes(report.id)}
-                      onChange={() => toggleUserReport(report.id)}
-                    />
-                    <span>{report.name}</span>
-                  </label>
-                ))}
-              </div>
-            </fieldset>
+            {userForm.role === "ADMIN" ? (
+              <p className="muted small">Usuarios administradores nao recebem paineis vinculados.</p>
+            ) : (
+              <fieldset>
+                <legend>Paineis liberados</legend>
+                <div className="selection-group-grid">
+                  {reportsGroupedByCategory.map((group) => {
+                    const groupReportIds = group.items.map((report) => report.id);
+                    const allSelected = groupReportIds.every((reportId) => userForm.reportIds.includes(reportId));
+
+                    return (
+                      <section key={group.key} className="selection-group-card">
+                        <label className="selection-group-header">
+                          <span style={group.color ? { color: group.color } : undefined}>{group.label}</span>
+                          <span className="selection-group-check">
+                            <input
+                              type="checkbox"
+                              checked={allSelected}
+                              onChange={(event) => toggleUserReportGroup(groupReportIds, event.target.checked)}
+                            />
+                            <span>Marcar todos</span>
+                          </span>
+                        </label>
+
+                        <div className="check-grid">
+                          {group.items.map((report) => (
+                            <label key={report.id} className="check-row">
+                              <input
+                                type="checkbox"
+                                checked={userForm.reportIds.includes(report.id)}
+                                onChange={() => toggleUserReport(report.id)}
+                              />
+                              <span>{report.name}</span>
+                            </label>
+                          ))}
+                        </div>
+                      </section>
+                    );
+                  })}
+                </div>
+              </fieldset>
+            )}
 
             <fieldset>
               <legend>Regras de filtro</legend>
