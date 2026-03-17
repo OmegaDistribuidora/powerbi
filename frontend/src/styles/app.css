@@ -312,11 +312,13 @@ label {
 
 .dashboard-card-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(260px, 300px));
   gap: 18px;
+  justify-content: start;
 }
 
 .dashboard-home-card {
+  width: min(100%, 300px);
   overflow: hidden;
   border-radius: 22px;
   border: 1px solid rgba(133, 167, 255, 0.18);
@@ -364,6 +366,10 @@ label {
   margin: 0;
   color: var(--muted);
   line-height: 1.6;
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
 .dashboard-card-action {
@@ -685,6 +691,10 @@ label {
   border-color: rgba(255, 123, 44, 0.28);
   background: rgba(255, 123, 44, 0.09);
   color: #ffd9c1;
+  max-width: 260px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .check-grid {
@@ -1342,5 +1352,13 @@ code {
   .report-embed-large {
     min-height: 78vh;
     height: 78vh;
+  }
+
+  .dashboard-card-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .dashboard-home-card {
+    width: 100%;
   }
 }

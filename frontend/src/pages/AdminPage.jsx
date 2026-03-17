@@ -148,6 +148,36 @@ function extractPowerBiEmbedData(embedUrl) {
   return null;
 }
 
+function shortenText(value, maxLength = 90) {
+  const text = String(value || "").trim();
+  if (!text) {
+    return "";
+  }
+
+  if (text.length <= maxLength) {
+    return text;
+  }
+
+  return `${text.slice(0, maxLength - 1)}...`;
+}
+
+function summarizeLink(value) {
+  const text = String(value || "").trim();
+  if (!text) {
+    return "";
+  }
+
+  try {
+    const url = new URL(text);
+    const host = url.hostname.replace(/^www\./i, "");
+    const path = url.pathname === "/" ? "" : url.pathname;
+    const summary = `${host}${path}`;
+    return shortenText(summary, 72);
+  } catch (error) {
+    return shortenText(text, 72);
+  }
+}
+
 function Modal({ title, children, onClose }) {
   return (
     <div className="modal-backdrop" role="presentation" onClick={onClose}>
@@ -1092,14 +1122,20 @@ export default function AdminPage() {
                             <span className="muted small">Ordem {card.sortOrder}</span>
                           </div>
                           <div className="admin-row-meta">
-                            {card.description ? <span className="tag-chip tag-chip-wide">{card.description}</span> : null}
+                            {card.description ? (
+                              <span className="tag-chip tag-chip-wide">{shortenText(card.description, 96)}</span>
+                            ) : null}
                             {card.actionLabel ? <span className="tag-chip">{card.actionLabel}</span> : null}
                             {card.users?.slice(0, 6).map((user) => (
                               <span key={`${card.id}-${user.id}`} className="tag-chip">
                                 {user.displayName}
                               </span>
                             ))}
-                            {card.actionUrl ? <span className="tag-chip tag-chip-accent">{card.actionUrl}</span> : null}
+                            {card.actionUrl ? (
+                              <span className="tag-chip tag-chip-accent" title={card.actionUrl}>
+                                {summarizeLink(card.actionUrl)}
+                              </span>
+                            ) : null}
                           </div>
                         </div>
                         <div className="admin-row-actions">
