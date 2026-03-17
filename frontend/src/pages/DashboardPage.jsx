@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../components/AuthProvider";
 import { apiJson } from "../services/api";
 
 export default function DashboardPage() {
   const { token } = useAuth();
+  const navigate = useNavigate();
   const [data, setData] = useState(null);
   const [error, setError] = useState("");
 
@@ -44,6 +45,20 @@ export default function DashboardPage() {
     return <div className="page-card">Carregando painel...</div>;
   }
 
+  function openCardAction(actionUrl) {
+    if (!actionUrl) {
+      return;
+    }
+
+    const isExternal = /^https?:\/\//i.test(actionUrl);
+    if (isExternal) {
+      window.open(actionUrl, "_blank", "noopener,noreferrer");
+      return;
+    }
+
+    navigate(actionUrl);
+  }
+
   return (
     <div className="page-stack">
       <section className="page-card hero-card">
@@ -60,9 +75,26 @@ export default function DashboardPage() {
           {data.homeCards.map((card) => {
             const isExternal = /^https?:\/\//i.test(card.actionUrl || "");
             const actionLabel = card.actionLabel?.trim() || "Abrir";
+            const isClickable = Boolean(card.actionUrl);
 
             return (
-              <article key={card.id} className="dashboard-home-card">
+              <article
+                key={card.id}
+                className={`dashboard-home-card ${isClickable ? "is-clickable" : ""}`}
+                role={isClickable ? "link" : undefined}
+                tabIndex={isClickable ? 0 : undefined}
+                onClick={isClickable ? () => openCardAction(card.actionUrl) : undefined}
+                onKeyDown={
+                  isClickable
+                    ? (event) => {
+                        if (event.key === "Enter" || event.key === " ") {
+                          event.preventDefault();
+                          openCardAction(card.actionUrl);
+                        }
+                      }
+                    : undefined
+                }
+              >
                 {card.imageUrl ? (
                   <div className="dashboard-home-card-image">
                     <img src={card.imageUrl} alt={card.title} />
@@ -80,11 +112,16 @@ export default function DashboardPage() {
                         target="_blank"
                         rel="noreferrer"
                         className="secondary-btn compact-btn dashboard-card-action"
+                        onClick={(event) => event.stopPropagation()}
                       >
                         {actionLabel}
                       </a>
                     ) : (
-                      <Link to={card.actionUrl} className="secondary-btn compact-btn dashboard-card-action">
+                      <Link
+                        to={card.actionUrl}
+                        className="secondary-btn compact-btn dashboard-card-action"
+                        onClick={(event) => event.stopPropagation()}
+                      >
                         {actionLabel}
                       </Link>
                     )
