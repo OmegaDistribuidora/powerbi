@@ -109,8 +109,8 @@ label {
 
 .login-brand-logo,
 .brand-logo {
-  width: 42px;
-  height: 42px;
+  width: 36px;
+  height: 36px;
   object-fit: contain;
   flex-shrink: 0;
 }
@@ -175,7 +175,7 @@ label {
 .app-shell {
   min-height: 100vh;
   display: grid;
-  grid-template-columns: 190px 1fr;
+  grid-template-columns: 215px 1fr;
 }
 
 .sidebar {
@@ -188,7 +188,7 @@ label {
 }
 
 .brand {
-  font-size: 1.12rem;
+  font-size: 1rem;
   font-weight: 800;
 }
 
@@ -203,6 +203,7 @@ label {
 }
 
 .brand-mark {
+  gap: 10px;
   white-space: nowrap;
 }
 
