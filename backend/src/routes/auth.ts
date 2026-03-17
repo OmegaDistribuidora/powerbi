@@ -11,7 +11,8 @@ const loginSchema = z.object({
 
 const changePasswordSchema = z
   .object({
-    currentPassword: z.string().min(1),
+    targetUserId: z.number().int().positive().optional(),
+    currentPassword: z.string().optional().default(""),
     newPassword: z.string().min(6),
     confirmPassword: z.string().min(6)
   })
@@ -110,14 +111,18 @@ export async function registerAuthRoutes(app: FastifyInstance): Promise<void> {
       return reply.code(400).send({ message: parsed.error.issues[0]?.message || "Dados invalidos." });
     }
 
-    const user = await prisma.user.findUnique({ where: { id: authUser.userId } });
-    if (!user || !user.active) {
+    const isAdmin = authUser.role === "ADMIN";
+    const targetUserId = parsed.data.targetUserId ?? authUser.userId;
+    const user = await prisma.user.findUnique({ where: { id: targetUserId } });
+    if (!user) {
       return reply.code(404).send({ message: "Usuario nao encontrado." });
     }
 
-    const validPassword = await comparePassword(parsed.data.currentPassword, user.passwordHash);
-    if (!validPassword) {
-      return reply.code(400).send({ message: "Senha atual incorreta." });
+    if (!isAdmin) {
+      const validPassword = await comparePassword(parsed.data.currentPassword, user.passwordHash);
+      if (!validPassword) {
+        return reply.code(400).send({ message: "Senha atual incorreta." });
+      }
     }
 
     const nextPasswordHash = await hashPassword(parsed.data.newPassword);
@@ -134,10 +139,13 @@ export async function registerAuthRoutes(app: FastifyInstance): Promise<void> {
         displayName: user.displayName,
         role: user.role
       },
-      action: "CHANGE_PASSWORD",
+      action: isAdmin && targetUserId !== authUser.userId ? "ADMIN_CHANGE_PASSWORD" : "CHANGE_PASSWORD",
       entityType: "USER",
       entityId: user.id,
-      summary: `${user.displayName} alterou a propria senha.`,
+      summary:
+        isAdmin && targetUserId !== authUser.userId
+          ? `${authUser.username} redefiniu a senha de ${user.displayName}.`
+          : `${user.displayName} alterou a propria senha.`,
       before: {
         password: "[redacted]"
       },

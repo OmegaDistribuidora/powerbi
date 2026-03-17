@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
 import { useAuth } from "../components/AuthProvider";
+import logo from "../assets/logo.png";
 
 export default function LoginPage() {
   const { login, isAuthenticated, user } = useAuth();
@@ -32,13 +33,14 @@ export default function LoginPage() {
   return (
     <div className="login-screen">
       <div className="login-card">
-        <div className="eyebrow">Portal de BI</div>
-        <h1>Power BI Hub</h1>
-        <p>Entre para visualizar os painéis liberados para o seu usuário.</p>
+        <div className="login-brand">
+          <img src={logo} alt="Omega BI Hub" className="login-brand-logo" />
+          <h1>Omega BI Hub</h1>
+        </div>
 
         <form onSubmit={handleSubmit} className="form-stack">
           <label>
-            Usuário
+            Usuario
             <input value={username} onChange={(event) => setUsername(event.target.value)} required />
           </label>
 

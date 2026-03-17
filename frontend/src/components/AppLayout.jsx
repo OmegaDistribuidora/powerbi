@@ -2,13 +2,22 @@ import { useEffect, useMemo, useState } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { useAuth } from "./AuthProvider";
 import { apiJson } from "../services/api";
+import logo from "../assets/logo.png";
 
-function PasswordModal({ onClose, onSubmit, saving, error, success }) {
+function PasswordModal({ onClose, onSubmit, saving, error, success, isAdmin, users, currentUserId }) {
   const [form, setForm] = useState({
+    targetUserId: currentUserId || "",
     currentPassword: "",
     newPassword: "",
     confirmPassword: ""
   });
+
+  useEffect(() => {
+    setForm((current) => ({
+      ...current,
+      targetUserId: currentUserId || ""
+    }));
+  }, [currentUserId]);
 
   function updateField(field, value) {
     setForm((current) => ({ ...current, [field]: value }));
@@ -45,15 +54,31 @@ function PasswordModal({ onClose, onSubmit, saving, error, success }) {
         </div>
 
         <form className="form-stack" onSubmit={handleSubmit}>
-          <label>
-            Senha atual
-            <input
-              type="password"
-              value={form.currentPassword}
-              onChange={(event) => updateField("currentPassword", event.target.value)}
-              required
-            />
-          </label>
+          {isAdmin ? (
+            <label>
+              Usuario
+              <select
+                value={form.targetUserId}
+                onChange={(event) => updateField("targetUserId", Number(event.target.value))}
+              >
+                {users.map((user) => (
+                  <option key={user.id} value={user.id}>
+                    {user.displayName} ({user.username})
+                  </option>
+                ))}
+              </select>
+            </label>
+          ) : (
+            <label>
+              Senha atual
+              <input
+                type="password"
+                value={form.currentPassword}
+                onChange={(event) => updateField("currentPassword", event.target.value)}
+                required
+              />
+            </label>
+          )}
 
           <label>
             Nova senha
@@ -99,6 +124,7 @@ export default function AppLayout() {
   const navigate = useNavigate();
   const [reports, setReports] = useState([]);
   const [categories, setCategories] = useState([]);
+  const [adminUsers, setAdminUsers] = useState([]);
   const [reportsError, setReportsError] = useState("");
   const [passwordModalOpen, setPasswordModalOpen] = useState(false);
   const [passwordSaving, setPasswordSaving] = useState(false);
@@ -109,6 +135,7 @@ export default function AppLayout() {
   useEffect(() => {
     if (!token) {
       setReports([]);
+      setAdminUsers([]);
       setReportsError("");
       return;
     }
@@ -136,6 +163,31 @@ export default function AppLayout() {
       active = false;
     };
   }, [token]);
+
+  useEffect(() => {
+    if (!token || user?.role !== "ADMIN") {
+      setAdminUsers([]);
+      return;
+    }
+
+    let active = true;
+    apiJson("/users", { token })
+      .then((payload) => {
+        if (!active) {
+          return;
+        }
+        setAdminUsers((payload.users || []).sort((a, b) => a.displayName.localeCompare(b.displayName)));
+      })
+      .catch(() => {
+        if (active) {
+          setAdminUsers([]);
+        }
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [token, user?.role]);
 
   const userReports = useMemo(() => {
     if (user?.role === "ADMIN") {
@@ -194,7 +246,10 @@ export default function AppLayout() {
       const payload = await apiJson("/auth/change-password", {
         method: "POST",
         token,
-        data: form
+        data: {
+          ...form,
+          targetUserId: form.targetUserId ? Number(form.targetUserId) : undefined
+        }
       });
       setPasswordSuccess(payload.message || "Senha alterada com sucesso.");
       resetForm();
@@ -216,7 +271,10 @@ export default function AppLayout() {
       <aside className="sidebar">
         <div>
           <NavLink to="/" className="brand brand-link">
-            Power BI Hub
+            <span className="brand-mark">
+              <img src={logo} alt="Omega BI Hub" className="brand-logo" />
+              <span>Omega BI Hub</span>
+            </span>
           </NavLink>
         </div>
 
@@ -283,6 +341,9 @@ export default function AppLayout() {
           saving={passwordSaving}
           error={passwordError}
           success={passwordSuccess}
+          isAdmin={user?.role === "ADMIN"}
+          users={adminUsers}
+          currentUserId={user?.id}
         />
       ) : null}
     </div>

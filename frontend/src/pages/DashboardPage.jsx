@@ -65,7 +65,7 @@ export default function DashboardPage() {
         <div>
           <div className="eyebrow">Bem-vindo</div>
           <h1>{data.user.displayName}</h1>
-          <p className="muted">Hoje e {friendlyDate}.</p>
+          <p className="muted">Hoje é {friendlyDate}.</p>
           <p className="muted">Selecione um painel a esquerda para acessar!</p>
         </div>
       </section>

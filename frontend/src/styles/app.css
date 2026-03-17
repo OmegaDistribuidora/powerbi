@@ -96,6 +96,25 @@ label {
   gap: 14px;
 }
 
+.login-brand,
+.brand-mark {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.login-brand h1 {
+  margin: 0;
+}
+
+.login-brand-logo,
+.brand-logo {
+  width: 42px;
+  height: 42px;
+  object-fit: contain;
+  flex-shrink: 0;
+}
+
 .eyebrow {
   text-transform: uppercase;
   letter-spacing: 0.08em;
@@ -174,7 +193,8 @@ label {
 }
 
 .brand-link {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
 }
 
 .brand-link:hover {
