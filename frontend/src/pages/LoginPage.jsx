@@ -4,7 +4,7 @@ import { useAuth } from "../components/AuthProvider";
 import logo from "../assets/logo.png";
 
 export default function LoginPage() {
-  const { login, isAuthenticated, user } = useAuth();
+  const { login, isAuthenticated, user, ssoError } = useAuth();
   const navigate = useNavigate();
   const [username, setUsername] = useState("admin");
   const [password, setPassword] = useState("Omega@123");
@@ -55,6 +55,7 @@ export default function LoginPage() {
           </label>
 
           {error ? <p className="error-text">{error}</p> : null}
+          {!error && ssoError ? <p className="error-text">{ssoError}</p> : null}
 
           <button type="submit" className="primary-btn" disabled={loading}>
             {loading ? "Entrando..." : "Entrar"}

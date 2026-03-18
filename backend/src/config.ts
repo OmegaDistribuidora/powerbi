@@ -22,5 +22,10 @@ export const env = {
   adminUsername: String(process.env.ADMIN_USERNAME || "admin").trim().toLowerCase(),
   adminPassword: String(process.env.ADMIN_PASSWORD || "Omega@123"),
   adminDisplayName: String(process.env.ADMIN_DISPLAY_NAME || "Administrador").trim(),
-  previewsDir: String(process.env.PREVIEWS_DIR || "/previews").trim()
+  previewsDir: String(process.env.PREVIEWS_DIR || "/previews").trim(),
+  ecosystemSso: {
+    issuer: String(process.env.ECOSYSTEM_SSO_ISSUER || "ecosistema-omega").trim(),
+    audience: String(process.env.ECOSYSTEM_SSO_AUDIENCE || "powerbi").trim(),
+    sharedSecret: String(process.env.ECOSYSTEM_SSO_SHARED_SECRET || "").trim()
+  }
 };

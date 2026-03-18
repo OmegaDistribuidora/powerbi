@@ -1,5 +1,7 @@
 import type { FastifyInstance } from "fastify";
+import jwt from "jsonwebtoken";
 import { z } from "zod";
+import { env } from "../config";
 import prisma from "../lib/prisma";
 import { recordAudit } from "../lib/audit";
 import { comparePassword, hashPassword, requireAuth, signToken } from "../lib/security";
@@ -7,6 +9,10 @@ import { comparePassword, hashPassword, requireAuth, signToken } from "../lib/se
 const loginSchema = z.object({
   username: z.string().min(1),
   password: z.string().min(1)
+});
+
+const ssoExchangeSchema = z.object({
+  token: z.string().min(1)
 });
 
 const changePasswordSchema = z
@@ -20,6 +26,44 @@ const changePasswordSchema = z
     message: "A confirmacao da senha nao confere.",
     path: ["confirmPassword"]
   });
+
+const consumedSsoTokens = new Map<string, number>();
+
+function cleanupConsumedSsoTokens(): void {
+  const now = Date.now();
+  for (const [jti, expiresAt] of consumedSsoTokens.entries()) {
+    if (expiresAt <= now) {
+      consumedSsoTokens.delete(jti);
+    }
+  }
+}
+
+function markConsumedSsoToken(jti: unknown, exp: unknown): void {
+  if (typeof jti !== "string" || typeof exp !== "number") {
+    return;
+  }
+
+  cleanupConsumedSsoTokens();
+  consumedSsoTokens.set(jti, exp * 1000);
+}
+
+function serializeUser(user: {
+  id: number;
+  username: string;
+  displayName: string;
+  profileLabel: string | null;
+  role: "ADMIN" | "USER";
+  active: boolean;
+}) {
+  return {
+    id: user.id,
+    username: user.username,
+    displayName: user.displayName,
+    profileLabel: user.profileLabel,
+    role: user.role,
+    active: user.active
+  };
+}
 
 export async function registerAuthRoutes(app: FastifyInstance): Promise<void> {
   app.post("/api/auth/login", async (request, reply) => {
@@ -63,14 +107,72 @@ export async function registerAuthRoutes(app: FastifyInstance): Promise<void> {
         username: user.username,
         role: user.role
       }),
-      user: {
+      user: serializeUser(user)
+    };
+  });
+
+  app.post("/api/auth/sso/exchange", async (request, reply) => {
+    if (!env.ecosystemSso.sharedSecret) {
+      return reply.code(404).send({ message: "Login delegado indisponivel." });
+    }
+
+    const parsed = ssoExchangeSchema.safeParse(request.body);
+    if (!parsed.success) {
+      return reply.code(400).send({ message: "Token SSO obrigatorio." });
+    }
+
+    let payload: jwt.JwtPayload;
+    try {
+      payload = jwt.verify(parsed.data.token, env.ecosystemSso.sharedSecret, {
+        algorithms: ["HS256"],
+        issuer: env.ecosystemSso.issuer,
+        audience: env.ecosystemSso.audience
+      }) as jwt.JwtPayload;
+    } catch (error) {
+      return reply.code(401).send({ message: "Token SSO invalido ou expirado." });
+    }
+
+    if (typeof payload.jti === "string" && consumedSsoTokens.has(payload.jti)) {
+      return reply.code(401).send({ message: "Token SSO ja utilizado." });
+    }
+
+    const targetLogin = String(payload.targetLogin || "").trim().toLowerCase();
+    if (!targetLogin) {
+      return reply.code(400).send({ message: "Token SSO sem login de destino." });
+    }
+
+    const user = await prisma.user.findUnique({ where: { username: targetLogin } });
+    if (!user || !user.active) {
+      return reply.code(401).send({ message: "Usuario alvo nao encontrado ou inativo." });
+    }
+
+    markConsumedSsoToken(payload.jti, payload.exp);
+
+    await recordAudit({
+      actorUser: {
         id: user.id,
         username: user.username,
         displayName: user.displayName,
-        profileLabel: user.profileLabel,
-        role: user.role,
-        active: user.active
+        role: user.role
+      },
+      action: "SSO_LOGIN",
+      entityType: "AUTH",
+      entityId: user.id,
+      summary: `${user.displayName} realizou login via Ecossistema Omega.`,
+      before: null,
+      after: {
+        authenticated: true,
+        source: "ecosistema-omega"
       }
+    });
+
+    return {
+      token: signToken({
+        userId: user.id,
+        username: user.username,
+        role: user.role
+      }),
+      user: serializeUser(user)
     };
   });
 
