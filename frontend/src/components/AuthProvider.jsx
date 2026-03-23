@@ -4,6 +4,22 @@ import { apiJson, setUnauthorizedHandler } from "../services/api";
 const STORAGE_KEY = "powerbi-auth";
 const AuthContext = createContext(null);
 
+function parseTokenExpiration(token) {
+  try {
+    const [, payload] = String(token || "").split(".");
+    if (!payload) {
+      return null;
+    }
+
+    const normalized = payload.replace(/-/g, "+").replace(/_/g, "/");
+    const padded = normalized.padEnd(Math.ceil(normalized.length / 4) * 4, "=");
+    const parsed = JSON.parse(atob(padded));
+    return typeof parsed.exp === "number" ? parsed.exp * 1000 : null;
+  } catch (error) {
+    return null;
+  }
+}
+
 function readStorage() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
@@ -32,14 +48,45 @@ function clearSsoHash() {
 export function AuthProvider({ children }) {
   const initial = readStorage();
   const initialSsoToken = readSsoTokenFromHash();
-  const [token, setToken] = useState(initial.token || null);
-  const [user, setUser] = useState(initial.user || null);
+  const initialExpiry = parseTokenExpiration(initial.token);
+  const hasInitialExpired = Boolean(initialExpiry && initialExpiry <= Date.now());
+  const [token, setToken] = useState(hasInitialExpired ? null : initial.token || null);
+  const [user, setUser] = useState(hasInitialExpired ? null : initial.user || null);
   const [loading, setLoading] = useState(Boolean(initialSsoToken || initial.token));
   const [ssoError, setSsoError] = useState("");
 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify({ token, user }));
   }, [token, user]);
+
+  useEffect(() => {
+    if (!token) {
+      return undefined;
+    }
+
+    const expiresAt = parseTokenExpiration(token);
+    if (!expiresAt) {
+      return undefined;
+    }
+
+    const remainingMs = expiresAt - Date.now();
+    if (remainingMs <= 0) {
+      setToken(null);
+      setUser(null);
+      setLoading(false);
+      setSsoError("");
+      return undefined;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      setToken(null);
+      setUser(null);
+      setLoading(false);
+      setSsoError("");
+    }, remainingMs);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [token]);
 
   useEffect(() => {
     setUnauthorizedHandler(() => {

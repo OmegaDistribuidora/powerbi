@@ -19,7 +19,7 @@ export async function comparePassword(password: string, hash: string): Promise<b
 }
 
 export function signToken(payload: JwtPayload): string {
-  return jwt.sign(payload, env.jwtSecret, { expiresIn: "12h" });
+  return jwt.sign(payload, env.jwtSecret, { expiresIn: "1h" });
 }
 
 export function verifyToken(token: string): AuthUser {
