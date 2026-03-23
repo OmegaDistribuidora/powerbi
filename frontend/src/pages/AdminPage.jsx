@@ -1193,16 +1193,21 @@ export default function AdminPage() {
         return apiJson(`/users/${user.id}`, {
           token,
           method: "PUT",
-          data: buildUserPayload({
-            username: user.username,
-            displayName: user.displayName,
-            profileLabel: user.profileLabel || "",
-            password: "",
-            role: user.role,
-            active: user.active,
-            reportIds: nextReportIds,
-            filterRules: nextFilterRules
-          })
+          data: buildUserPayload(
+            {
+              username: user.username,
+              displayName: user.displayName,
+              profileLabel: user.profileLabel || "",
+              password: "",
+              role: user.role,
+              active: user.active,
+              reportIds: nextReportIds,
+              filterRules: nextFilterRules
+            },
+            {
+              extraAllowedReportIds: [reportId]
+            }
+          )
         });
       })
     );
@@ -1220,7 +1225,10 @@ export default function AdminPage() {
     });
   }
 
-  function buildUserPayload(form) {
+  function buildUserPayload(form, options = {}) {
+    const extraAllowedReportIds = new Set((options.extraAllowedReportIds || []).map(Number));
+    const isAllowedReportId = (reportId) => activeReportIds.has(reportId) || extraAllowedReportIds.has(reportId);
+
     if (form.role === "ADMIN") {
       return {
         ...form,
@@ -1231,14 +1239,14 @@ export default function AdminPage() {
 
     return {
       ...form,
-      reportIds: form.reportIds.filter((reportId) => activeReportIds.has(reportId)),
+      reportIds: form.reportIds.filter((reportId) => isAllowedReportId(reportId)),
       filterRules: form.filterRules
         .filter(
           (rule) =>
             rule.tableName &&
             rule.columnName &&
             rule.value &&
-            (rule.reportId == null || activeReportIds.has(Number(rule.reportId)))
+            (rule.reportId == null || isAllowedReportId(Number(rule.reportId)))
         )
         .map((rule) => ({
           reportId: rule.reportId ? Number(rule.reportId) : null,

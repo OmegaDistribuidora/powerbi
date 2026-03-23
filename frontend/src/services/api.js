@@ -33,13 +33,16 @@ async function request(path, { token, headers = {}, body, method = "GET" } = {})
 }
 
 export function apiJson(path, { token, method = "GET", data } = {}) {
+  const hasBody = typeof data !== "undefined";
   return request(path, {
     token,
     method,
-    headers: {
-      "Content-Type": "application/json"
-    },
-    body: data ? JSON.stringify(data) : undefined
+    headers: hasBody
+      ? {
+          "Content-Type": "application/json"
+        }
+      : undefined,
+    body: hasBody ? JSON.stringify(data) : undefined
   });
 }
 
