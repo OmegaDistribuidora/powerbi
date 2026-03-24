@@ -50,9 +50,12 @@ export function AuthProvider({ children }) {
   const initialSsoToken = readSsoTokenFromHash();
   const initialExpiry = parseTokenExpiration(initial.token);
   const hasInitialExpired = Boolean(initialExpiry && initialExpiry <= Date.now());
-  const [token, setToken] = useState(hasInitialExpired ? null : initial.token || null);
-  const [user, setUser] = useState(hasInitialExpired ? null : initial.user || null);
-  const [loading, setLoading] = useState(Boolean(initialSsoToken || initial.token));
+  const shouldPreferSso = Boolean(initialSsoToken);
+  const [token, setToken] = useState(shouldPreferSso || hasInitialExpired ? null : initial.token || null);
+  const [user, setUser] = useState(shouldPreferSso || hasInitialExpired ? null : initial.user || null);
+  const [loading, setLoading] = useState(
+    Boolean(initialSsoToken || (!shouldPreferSso && !hasInitialExpired && initial.token))
+  );
   const [ssoError, setSsoError] = useState("");
 
   useEffect(() => {
@@ -101,11 +104,13 @@ export function AuthProvider({ children }) {
 
   useEffect(() => {
     const ssoToken = readSsoTokenFromHash();
-    if (token || !ssoToken) {
+    if (!ssoToken) {
       return undefined;
     }
 
     let alive = true;
+    setToken(null);
+    setUser(null);
     setLoading(true);
     setSsoError("");
     apiJson("/auth/sso/exchange", {
@@ -133,7 +138,7 @@ export function AuthProvider({ children }) {
     return () => {
       alive = false;
     };
-  }, [token]);
+  }, []);
 
   useEffect(() => {
     const pendingSsoToken = readSsoTokenFromHash();
