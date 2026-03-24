@@ -146,6 +146,13 @@ export async function registerAuthRoutes(app: FastifyInstance): Promise<void> {
       return reply.code(401).send({ message: "Usuario alvo nao encontrado ou inativo." });
     }
 
+    const ecosystemUsername = String(payload.ecosystemUsername || "").trim().toLowerCase();
+    const ecosystemIsAdmin = payload.ecosystemIsAdmin === true;
+
+    if (user.role === "ADMIN" && !ecosystemIsAdmin) {
+      return reply.code(403).send({ message: "Usuario do Ecossistema nao pode acessar administrador via SSO." });
+    }
+
     markConsumedSsoToken(payload.jti, payload.exp);
 
     await recordAudit({
@@ -162,7 +169,9 @@ export async function registerAuthRoutes(app: FastifyInstance): Promise<void> {
       before: null,
       after: {
         authenticated: true,
-        source: "ecosistema-omega"
+        source: "ecosistema-omega",
+        ecosystemUsername: ecosystemUsername || null,
+        targetLogin
       }
     });
 
