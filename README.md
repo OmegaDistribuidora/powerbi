@@ -51,7 +51,7 @@ O usuario administrador inicial e criado automaticamente pelo backend usando as 
 - `ADMIN_PASSWORD`
 - `ADMIN_DISPLAY_NAME`
 
-Defina esses valores no ambiente local e no Railway. Evite registrar credenciais reais no repositorio.
+Defina esses valores apenas no ambiente de execucao. Evite credenciais previsiveis e nunca exponha valores reais em repositorios, logs ou capturas de tela.
 
 ## Protecao extra para admin via SSO
 
@@ -62,13 +62,15 @@ Para reforcar o login administrativo vindo do Ecossistema Omega, voce pode defin
 Exemplo:
 
 ```bash
-ECOSYSTEM_SSO_ADMIN_USERS=admin,william
+ECOSYSTEM_SSO_ADMIN_USERS=<login_admin_1>,<login_admin_2>
 ```
 
 Se o usuario local alvo for `ADMIN`, o backend exigira:
 
 - `ecosystemIsAdmin = true` no token SSO
 - e que o login do Ecossistema esteja nessa allowlist ou seja igual ao `targetLogin`
+
+Tambem e recomendado rotacionar periodicamente `ADMIN_PASSWORD`, `JWT_SECRET` e `ECOSYSTEM_SSO_SHARED_SECRET`.
 
 ## Variaveis do frontend para Power BI Pro
 
