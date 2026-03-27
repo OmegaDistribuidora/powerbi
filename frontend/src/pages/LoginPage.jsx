@@ -6,8 +6,8 @@ import logo from "../assets/logo.png";
 export default function LoginPage() {
   const { login, isAuthenticated, user, ssoError } = useAuth();
   const navigate = useNavigate();
-  const [username, setUsername] = useState("admin");
-  const [password, setPassword] = useState("Omega@123");
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
