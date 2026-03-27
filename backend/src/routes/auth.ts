@@ -1,4 +1,4 @@
-import type { FastifyInstance } from "fastify";
+import type { FastifyInstance, FastifyReply } from "fastify";
 import jwt from "jsonwebtoken";
 import { z } from "zod";
 import { env } from "../config";
@@ -65,6 +65,43 @@ function serializeUser(user: {
   };
 }
 
+async function blockAdminSsoLogin(
+  reply: FastifyReply,
+  user: {
+    id: number;
+    username: string;
+    displayName: string;
+    role: "ADMIN" | "USER";
+  },
+  details: {
+    ecosystemUsername: string | null;
+    targetLogin: string;
+    reason: string;
+    ecosystemIsAdmin: boolean;
+  }
+) {
+  await recordAudit({
+    actorUser: {
+      id: user.id,
+      username: user.username,
+      displayName: user.displayName,
+      role: user.role
+    },
+    action: "SSO_ADMIN_LOGIN_BLOCKED",
+    entityType: "AUTH",
+    entityId: user.id,
+    summary: `${user.displayName} teve o login administrativo via SSO bloqueado.`,
+    before: null,
+    after: {
+      authenticated: false,
+      source: "ecosistema-omega",
+      ...details
+    }
+  });
+
+  return reply.code(403).send({ message: "Usuario do Ecossistema nao autorizado a acessar administrador via SSO." });
+}
+
 export async function registerAuthRoutes(app: FastifyInstance): Promise<void> {
   app.post("/api/auth/login", async (request, reply) => {
     const parsed = loginSchema.safeParse(request.body);
@@ -82,6 +119,29 @@ export async function registerAuthRoutes(app: FastifyInstance): Promise<void> {
     const validPassword = await comparePassword(parsed.data.password, user.passwordHash);
     if (!validPassword) {
       return reply.code(401).send({ message: "Credenciais invalidas." });
+    }
+
+    if (env.nodeEnv === "production" && user.role === "ADMIN") {
+      await recordAudit({
+        actorUser: {
+          id: user.id,
+          username: user.username,
+          displayName: user.displayName,
+          role: user.role
+        },
+        action: "LOCAL_ADMIN_LOGIN_BLOCKED",
+        entityType: "AUTH",
+        entityId: user.id,
+        summary: `${user.displayName} teve o login local de administrador bloqueado em producao.`,
+        before: null,
+        after: {
+          authenticated: false,
+          source: "local",
+          reason: "admin-local-login-disabled-in-production"
+        }
+      });
+
+      return reply.code(403).send({ message: "Login local para administradores esta desabilitado em producao." });
     }
 
     await recordAudit({
@@ -148,9 +208,26 @@ export async function registerAuthRoutes(app: FastifyInstance): Promise<void> {
 
     const ecosystemUsername = String(payload.ecosystemUsername || "").trim().toLowerCase();
     const ecosystemIsAdmin = payload.ecosystemIsAdmin === true;
+    const ecosystemAdminUsers = env.ecosystemSso.adminUsers;
+    const sameLoginAdminAccess = Boolean(ecosystemUsername) && ecosystemUsername === targetLogin;
+    const allowlistedAdminAccess = Boolean(ecosystemUsername) && ecosystemAdminUsers.includes(ecosystemUsername);
 
     if (user.role === "ADMIN" && !ecosystemIsAdmin) {
-      return reply.code(403).send({ message: "Usuario do Ecossistema nao pode acessar administrador via SSO." });
+      return blockAdminSsoLogin(reply, user, {
+        ecosystemUsername: ecosystemUsername || null,
+        targetLogin,
+        reason: "missing-admin-claim",
+        ecosystemIsAdmin
+      });
+    }
+
+    if (user.role === "ADMIN" && !sameLoginAdminAccess && !allowlistedAdminAccess) {
+      return blockAdminSsoLogin(reply, user, {
+        ecosystemUsername: ecosystemUsername || null,
+        targetLogin,
+        reason: "ecosystem-admin-user-not-allowlisted",
+        ecosystemIsAdmin
+      });
     }
 
     markConsumedSsoToken(payload.jti, payload.exp);

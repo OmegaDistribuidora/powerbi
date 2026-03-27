@@ -2,6 +2,13 @@ import fs from "node:fs";
 import path from "node:path";
 import dotenv from "dotenv";
 
+function parseNormalizedList(value: string | undefined): string[] {
+  return String(value || "")
+    .split(",")
+    .map((item) => item.trim().toLowerCase())
+    .filter(Boolean);
+}
+
 const envCandidates = [
   path.resolve(process.cwd(), ".env"),
   path.resolve(process.cwd(), "..", ".env"),
@@ -26,6 +33,7 @@ export const env = {
   ecosystemSso: {
     issuer: String(process.env.ECOSYSTEM_SSO_ISSUER || "ecosistema-omega").trim(),
     audience: String(process.env.ECOSYSTEM_SSO_AUDIENCE || "powerbi").trim(),
-    sharedSecret: String(process.env.ECOSYSTEM_SSO_SHARED_SECRET || "").trim()
+    sharedSecret: String(process.env.ECOSYSTEM_SSO_SHARED_SECRET || "").trim(),
+    adminUsers: parseNormalizedList(process.env.ECOSYSTEM_SSO_ADMIN_USERS)
   }
 };
