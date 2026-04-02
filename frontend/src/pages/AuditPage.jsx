@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useState } from "react";
+﻿import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "../components/AuthProvider";
 import { apiJson } from "../services/api";
 
 const FORTALEZA_TZ = "America/Fortaleza";
+const PAGE_SIZE = 30;
 
 function EyeIcon() {
   return (
@@ -32,24 +33,12 @@ function shouldShowBefore(log) {
 }
 
 function actionTone(action) {
-  if (action === "LOGIN") {
-    return "is-login";
-  }
-  if (action === "VIEW_REPORT") {
-    return "is-view";
-  }
-  if (action.includes("PASSWORD")) {
-    return "is-password";
-  }
-  if (action.includes("CATEGORY")) {
-    return "is-category";
-  }
-  if (action.includes("REPORT")) {
-    return "is-report";
-  }
-  if (action.includes("USER") || action.includes("HOME_CARD")) {
-    return "is-user";
-  }
+  if (action === "LOGIN") return "is-login";
+  if (action === "VIEW_REPORT") return "is-view";
+  if (action.includes("PASSWORD")) return "is-password";
+  if (action.includes("CATEGORY")) return "is-category";
+  if (action.includes("REPORT")) return "is-report";
+  if (action.includes("USER") || action.includes("HOME_CARD")) return "is-user";
   return "is-default";
 }
 
@@ -63,39 +52,6 @@ function formatAuditDate(value) {
     minute: "2-digit",
     second: "2-digit"
   }).format(new Date(value));
-}
-
-function fortalezaDayKey(value) {
-  return new Intl.DateTimeFormat("en-CA", {
-    timeZone: FORTALEZA_TZ,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit"
-  }).format(new Date(value));
-}
-
-function fortalezaMonthKey(value) {
-  return new Intl.DateTimeFormat("en-CA", {
-    timeZone: FORTALEZA_TZ,
-    year: "numeric",
-    month: "2-digit"
-  }).format(new Date(value));
-}
-
-function matchesPeriod(log, period) {
-  const logDate = new Date(log.createdAt);
-  const now = new Date();
-
-  if (period === "today") {
-    return fortalezaDayKey(logDate) === fortalezaDayKey(now);
-  }
-
-  if (period === "week") {
-    const diffMs = now.getTime() - logDate.getTime();
-    return diffMs >= 0 && diffMs <= 7 * 24 * 60 * 60 * 1000;
-  }
-
-  return fortalezaMonthKey(logDate) === fortalezaMonthKey(now);
 }
 
 function isPlainObject(value) {
@@ -138,10 +94,7 @@ function buildChangedPair(before, after) {
   }
 
   if (Array.isArray(normalizedBefore) || Array.isArray(normalizedAfter)) {
-    return {
-      before: normalizedBefore,
-      after: normalizedAfter
-    };
+    return { before: normalizedBefore, after: normalizedAfter };
   }
 
   if (isPlainObject(normalizedBefore) && isPlainObject(normalizedAfter)) {
@@ -151,10 +104,7 @@ function buildChangedPair(before, after) {
 
     keys.forEach((key) => {
       const childDiff = buildChangedPair(normalizedBefore[key], normalizedAfter[key]);
-      if (!childDiff) {
-        return;
-      }
-
+      if (!childDiff) return;
       beforeResult[key] = childDiff.before;
       afterResult[key] = childDiff.after;
     });
@@ -163,16 +113,10 @@ function buildChangedPair(before, after) {
       return null;
     }
 
-    return {
-      before: beforeResult,
-      after: afterResult
-    };
+    return { before: beforeResult, after: afterResult };
   }
 
-  return {
-    before: normalizedBefore,
-    after: normalizedAfter
-  };
+  return { before: normalizedBefore, after: normalizedAfter };
 }
 
 function AuditDetailsModal({ log, onClose }) {
@@ -284,35 +228,56 @@ function AuditList({ logs, emptyMessage, showInspect }) {
   );
 }
 
+function MoreButton({ visible, loading, onClick }) {
+  if (!visible) {
+    return null;
+  }
+
+  return (
+    <button type="button" className="secondary-btn audit-more-btn" onClick={onClick} disabled={loading}>
+      {loading ? "Carregando..." : "Mostrar mais"}
+    </button>
+  );
+}
+
 export default function AuditPage() {
   const { token } = useAuth();
-  const [logs, setLogs] = useState([]);
+  const [period, setPeriod] = useState("week");
   const [error, setError] = useState("");
   const [selectedLog, setSelectedLog] = useState(null);
-  const [period, setPeriod] = useState("month");
+  const [loginState, setLoginState] = useState({ logs: [], offset: 0, total: 0, hasMore: false, loading: false });
+  const [actionState, setActionState] = useState({ logs: [], offset: 0, total: 0, hasMore: false, loading: false });
+
+  async function loadLogs(kind, offset = 0, append = false) {
+    const setter = kind === "logins" ? setLoginState : setActionState;
+
+    setter((current) => ({ ...current, loading: true }));
+
+    try {
+      const payload = await apiJson(
+        `/audit?kind=${kind}&period=${period}&offset=${offset}&limit=${PAGE_SIZE}`,
+        { token }
+      );
+
+      setter((current) => ({
+        logs: append ? [...current.logs, ...(payload.logs || [])] : payload.logs || [],
+        offset: (payload.offset || 0) + (payload.logs?.length || 0),
+        total: payload.total || 0,
+        hasMore: Boolean(payload.hasMore),
+        loading: false
+      }));
+      setError("");
+    } catch (requestError) {
+      setter((current) => ({ ...current, loading: false }));
+      setError(requestError.message);
+    }
+  }
 
   useEffect(() => {
-    let active = true;
-    apiJson("/audit", { token })
-      .then((payload) => {
-        if (active) {
-          setLogs(payload.logs || []);
-        }
-      })
-      .catch((requestError) => {
-        if (active) {
-          setError(requestError.message);
-        }
-      });
-
-    return () => {
-      active = false;
-    };
-  }, [token]);
-
-  const filteredLogs = useMemo(() => logs.filter((log) => matchesPeriod(log, period)), [logs, period]);
-  const loginLogs = useMemo(() => filteredLogs.filter(isLoginEvent).slice(0, 30), [filteredLogs]);
-  const otherLogs = useMemo(() => filteredLogs.filter((log) => !isLoginEvent(log)).slice(0, 30), [filteredLogs]);
+    setSelectedLog(null);
+    loadLogs("logins", 0, false);
+    loadLogs("actions", 0, false);
+  }, [period, token]);
 
   if (error) {
     return <div className="page-card error-text">{error}</div>;
@@ -329,7 +294,6 @@ export default function AuditPage() {
           <select className="audit-period-select" value={period} onChange={(event) => setPeriod(event.target.value)}>
             <option value="today">Hoje</option>
             <option value="week">Semana</option>
-            <option value="month">Mês</option>
           </select>
         </div>
       </section>
@@ -338,17 +302,19 @@ export default function AuditPage() {
         <article className="page-card">
           <div className="header-line">
             <h2>Logins</h2>
-            <span className="muted small">{loginLogs.length} registro(s)</span>
+            <span className="muted small">{loginState.total} registro(s)</span>
           </div>
-          <AuditList logs={loginLogs} emptyMessage="Nenhum login auditado neste período." />
+          <AuditList logs={loginState.logs} emptyMessage="Nenhum login auditado neste período." />
+          <MoreButton visible={loginState.hasMore} loading={loginState.loading} onClick={() => loadLogs("logins", loginState.offset, true)} />
         </article>
 
         <article className="page-card">
           <div className="header-line">
             <h2>Ações</h2>
-            <span className="muted small">{otherLogs.length} registro(s)</span>
+            <span className="muted small">{actionState.total} registro(s)</span>
           </div>
-          <AuditList logs={otherLogs} emptyMessage="Nenhuma ação auditada neste período." showInspect={setSelectedLog} />
+          <AuditList logs={actionState.logs} emptyMessage="Nenhuma ação auditada neste período." showInspect={setSelectedLog} />
+          <MoreButton visible={actionState.hasMore} loading={actionState.loading} onClick={() => loadLogs("actions", actionState.offset, true)} />
         </article>
       </section>
 

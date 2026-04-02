@@ -1,4 +1,4 @@
-import fs from "node:fs";
+﻿import fs from "node:fs";
 import path from "node:path";
 import Fastify from "fastify";
 import cors from "@fastify/cors";
@@ -14,6 +14,7 @@ import { registerDashboardRoutes } from "./routes/dashboard";
 import { registerAuditRoutes } from "./routes/audit";
 import { registerReportCategoryRoutes } from "./routes/reportCategories";
 import { registerHomeCardRoutes } from "./routes/homeCards";
+import { registerReportAnalyticsRoutes } from "./routes/reportAnalytics";
 import type { AuthUser } from "./types";
 
 declare module "fastify" {
@@ -44,6 +45,7 @@ async function bootstrap(): Promise<void> {
   await registerReportCategoryRoutes(app);
   await registerHomeCardRoutes(app);
   await registerDashboardRoutes(app);
+  await registerReportAnalyticsRoutes(app);
   await registerAuditRoutes(app);
 
   if (env.previewsDir) {
@@ -85,3 +87,4 @@ bootstrap().catch(async (error) => {
   await prisma.$disconnect().catch(() => undefined);
   process.exit(1);
 });
+

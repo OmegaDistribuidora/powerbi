@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+﻿import { useEffect, useMemo, useState } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { useAuth } from "./AuthProvider";
 import { apiJson } from "../services/api";
@@ -311,6 +311,9 @@ export default function AppLayout() {
               </NavLink>
               <NavLink to="/mapping" className="nav-link">
                 Mapeamento de painéis
+              </NavLink>
+              <NavLink to="/reports-analytics" className="nav-link">
+                Relatórios
               </NavLink>
               <NavLink to="/audit" className="nav-link">
                 Auditoria

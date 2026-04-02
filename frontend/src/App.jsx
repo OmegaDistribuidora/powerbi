@@ -8,6 +8,7 @@ import AdminPage from "./pages/AdminPage";
 import ReportViewPage from "./pages/ReportViewPage";
 import AuditPage from "./pages/AuditPage";
 import MappingPage from "./pages/MappingPage";
+import ReportsAnalyticsPage from "./pages/ReportsAnalyticsPage";
 
 export default function App() {
   return (
@@ -44,6 +45,14 @@ export default function App() {
           element={
             <AdminRoute>
               <MappingPage />
+            </AdminRoute>
+          }
+        />
+        <Route
+          path="reports-analytics"
+          element={
+            <AdminRoute>
+              <ReportsAnalyticsPage />
             </AdminRoute>
           }
         />
