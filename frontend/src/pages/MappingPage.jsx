@@ -2,28 +2,54 @@ import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "../components/AuthProvider";
 import { apiJson } from "../services/api";
 
+const LAYOUT = {
+  categoryX: 44,
+  reportX: 272,
+  userX: 500,
+  top: 48,
+  rowGap: 42,
+  categoryGap: 52,
+  nodeWidth: 154,
+  nodeHeight: 32,
+  nodeRadius: 11,
+  dotOffsetX: 14,
+  labelOffsetX: 26,
+  minCanvasWidth: 676
+};
+
+function truncateLabel(value, maxLength) {
+  const text = String(value || "").trim();
+  if (text.length <= maxLength) {
+    return text;
+  }
+  return `${text.slice(0, Math.max(0, maxLength - 1)).trimEnd()}…`;
+}
+
 function buildNodes(categories, reports, users) {
   const categoryNodes = categories.map((category, index) => ({
     id: `category-${category.id}`,
-    label: category.name,
-    x: 120,
-    y: 110 + index * 140,
+    label: truncateLabel(category.name, 18),
+    fullLabel: category.name,
+    x: LAYOUT.categoryX,
+    y: LAYOUT.top + index * LAYOUT.categoryGap,
     color: category.color || "#ff7b2c"
   }));
 
   const reportNodes = reports.map((report, index) => ({
     id: `report-${report.id}`,
-    label: report.name,
-    x: 420,
-    y: 80 + index * 92,
+    label: truncateLabel(report.name, 19),
+    fullLabel: report.name,
+    x: LAYOUT.reportX,
+    y: LAYOUT.top + index * LAYOUT.rowGap,
     color: report.category?.color || "#8fa9ff"
   }));
 
   const userNodes = users.map((user, index) => ({
     id: `user-${user.id}`,
-    label: user.displayName,
-    x: 740,
-    y: 80 + index * 92,
+    label: truncateLabel(user.displayName, 17),
+    fullLabel: user.displayName,
+    x: LAYOUT.userX,
+    y: LAYOUT.top + index * LAYOUT.rowGap,
     color: user.active ? "#2ec27e" : "#9cb0d1"
   }));
 
@@ -54,6 +80,19 @@ function buildEdges(reports, users) {
   });
 
   return edges;
+}
+
+function buildCanvasMetrics(categories, reports, users) {
+  const tallestColumn = Math.max(
+    categories.length ? LAYOUT.top + (categories.length - 1) * LAYOUT.categoryGap : 0,
+    reports.length ? LAYOUT.top + (reports.length - 1) * LAYOUT.rowGap : 0,
+    users.length ? LAYOUT.top + (users.length - 1) * LAYOUT.rowGap : 0
+  );
+
+  return {
+    width: LAYOUT.minCanvasWidth,
+    height: Math.max(360, tallestColumn + 56)
+  };
 }
 
 export default function MappingPage() {
@@ -94,21 +133,21 @@ export default function MappingPage() {
 
   const nodes = useMemo(() => buildNodes(categories, reports, users), [categories, reports, users]);
   const edges = useMemo(() => buildEdges(reports, users), [reports, users]);
+  const canvas = useMemo(() => buildCanvasMetrics(categories, reports, users), [categories, reports, users]);
+  const nodeIndex = useMemo(() => new Map(nodes.map((node) => [node.id, node])), [nodes]);
 
   const highlightedEdgeIds = useMemo(() => {
     if (!selectedNodeId) {
       return new Set(edges.map((edge) => edge.id));
     }
 
-    return new Set(edges.filter((edge) => edge.from === selectedNodeId || edge.to === selectedNodeId).map((edge) => edge.id));
+    return new Set(
+      edges.filter((edge) => edge.from === selectedNodeId || edge.to === selectedNodeId).map((edge) => edge.id)
+    );
   }, [edges, selectedNodeId]);
 
   function isNodeHighlighted(nodeId) {
-    if (!selectedNodeId) {
-      return true;
-    }
-
-    if (nodeId === selectedNodeId) {
+    if (!selectedNodeId || nodeId === selectedNodeId) {
       return true;
     }
 
@@ -147,10 +186,15 @@ export default function MappingPage() {
         </div>
 
         <div className="mapping-scroll">
-          <svg className="mapping-canvas" viewBox="0 0 980 980" role="img" aria-label="Mapeamento de categorias, painéis e usuários">
+          <svg
+            className="mapping-canvas"
+            viewBox={`0 0 ${canvas.width} ${canvas.height}`}
+            role="img"
+            aria-label="Mapeamento de categorias, painéis e usuários"
+          >
             {edges.map((edge) => {
-              const from = nodes.find((node) => node.id === edge.from);
-              const to = nodes.find((node) => node.id === edge.to);
+              const from = nodeIndex.get(edge.from);
+              const to = nodeIndex.get(edge.to);
 
               if (!from || !to) {
                 return null;
@@ -159,7 +203,7 @@ export default function MappingPage() {
               return (
                 <path
                   key={edge.id}
-                  d={`M ${from.x + 96} ${from.y} C ${from.x + 200} ${from.y}, ${to.x - 80} ${to.y}, ${to.x - 8} ${to.y}`}
+                  d={`M ${from.x + LAYOUT.nodeWidth - 3} ${from.y} C ${from.x + LAYOUT.nodeWidth + 42} ${from.y}, ${to.x - 44} ${to.y}, ${to.x - 4} ${to.y}`}
                   className={`mapping-edge ${highlightedEdgeIds.has(edge.id) ? "is-highlighted" : "is-dimmed"}`}
                 />
               );
@@ -172,18 +216,19 @@ export default function MappingPage() {
                 onClick={() => setSelectedNodeId((current) => (current === node.id ? "" : node.id))}
                 role="button"
               >
+                <title>{node.fullLabel}</title>
                 <rect
-                  x={node.x - 8}
-                  y={node.y - 28}
-                  width="200"
-                  height="56"
-                  rx="18"
-                  fill="rgba(10, 22, 45, 0.94)"
+                  x={node.x}
+                  y={node.y - LAYOUT.nodeHeight / 2}
+                  width={LAYOUT.nodeWidth}
+                  height={LAYOUT.nodeHeight}
+                  rx={LAYOUT.nodeRadius}
+                  fill="rgba(10, 22, 45, 0.96)"
                   stroke={node.color}
-                  strokeWidth="1.5"
+                  strokeWidth="1.15"
                 />
-                <circle cx={node.x + 18} cy={node.y} r="6" fill={node.color} />
-                <text x={node.x + 34} y={node.y + 5} fill="currentColor">
+                <circle cx={node.x + LAYOUT.dotOffsetX} cy={node.y} r="4.1" fill={node.color} />
+                <text x={node.x + LAYOUT.labelOffsetX} y={node.y + 4} fill="currentColor">
                   {node.label}
                 </text>
               </g>

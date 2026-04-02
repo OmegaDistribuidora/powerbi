@@ -1293,12 +1293,12 @@ label {
 
 .mapping-card {
   display: grid;
-  gap: 14px;
+  gap: 10px;
 }
 
 .mapping-legend {
   display: flex;
-  gap: 10px;
+  gap: 8px;
   flex-wrap: wrap;
 }
 
@@ -1306,10 +1306,10 @@ label {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 7px 10px;
+  padding: 5px 8px;
   border-radius: 999px;
   border: 1px solid var(--border);
-  font-size: 0.8rem;
+  font-size: 0.72rem;
 }
 
 .mapping-legend-chip.is-category {
@@ -1330,14 +1330,14 @@ label {
 
 .mapping-canvas {
   width: 100%;
-  min-width: 920px;
-  min-height: 820px;
+  min-width: 640px;
+  min-height: 360px;
   color: var(--text);
 }
 
 .mapping-edge {
   fill: none;
-  stroke-width: 2.5;
+  stroke-width: 1.8;
 }
 
 .mapping-edge.is-highlighted {
@@ -1351,6 +1351,11 @@ label {
 .mapping-node {
   cursor: pointer;
   transition: opacity 0.2s ease;
+}
+
+.mapping-node text {
+  font-size: 0.74rem;
+  font-weight: 600;
 }
 
 .mapping-node.is-highlighted {
