@@ -56,7 +56,10 @@ function BarList({ title, items, valueFormatter, labelFormatter }) {
                 <span className="muted small">{valueFormatter(item.value)}</span>
               </div>
               <div className="analytics-bar-track">
-                <div className="analytics-bar-fill" style={{ width: `${Math.max(6, (item.value / maxValue) * 100)}%` }} />
+                <div
+                  className="analytics-bar-fill"
+                  style={{ width: `${Math.max(6, (item.value / maxValue) * 100)}%` }}
+                />
               </div>
             </div>
           ))
@@ -118,8 +121,20 @@ function VerticalBarChart({ title, items, valueFormatter, labelFormatter }) {
               return (
                 <g key={item.key}>
                   <title>{`${labelFormatter(item.label)}: ${valueFormatter(item.value)}`}</title>
-                  <rect x={x} y={y} width={barWidth} height={Math.max(2, height)} rx={7} className="analytics-bar-vertical" />
-                  <text x={x + barWidth / 2} y={topPadding + chartHeight + 18} textAnchor="middle" className="analytics-axis-text">
+                  <rect
+                    x={x}
+                    y={y}
+                    width={barWidth}
+                    height={Math.max(2, height)}
+                    rx={7}
+                    className="analytics-bar-vertical"
+                  />
+                  <text
+                    x={x + barWidth / 2}
+                    y={topPadding + chartHeight + 18}
+                    textAnchor="middle"
+                    className="analytics-axis-text"
+                  >
                     {labelFormatter(item.label)}
                   </text>
                 </g>
@@ -129,6 +144,57 @@ function VerticalBarChart({ title, items, valueFormatter, labelFormatter }) {
         </div>
       ) : (
         <p className="muted">Nenhum dado disponível no período selecionado.</p>
+      )}
+    </article>
+  );
+}
+
+function UserStatsTable({ users }) {
+  return (
+    <article className="page-card analytics-card">
+      <div className="header-line">
+        <h2>Dados por usuário</h2>
+      </div>
+      {users.length ? (
+        <div className="analytics-table-wrap">
+          <table className="analytics-table">
+            <thead>
+              <tr>
+                <th>Usuário</th>
+                <th>Perfil</th>
+                <th>Total de acessos</th>
+                <th>Painel mais acessado</th>
+                <th>Hora de pico</th>
+                <th>Dia de pico</th>
+                <th>Painéis distintos</th>
+              </tr>
+            </thead>
+            <tbody>
+              {users.map((user) => (
+                <tr key={user.userId}>
+                  <td>{user.displayName}</td>
+                  <td>{user.profileLabel || "Sem perfil"}</td>
+                  <td>{user.totalViews}</td>
+                  <td>
+                    {user.topReportName}
+                    <span className="muted small"> · {user.topReportAccesses} acesso(s)</span>
+                  </td>
+                  <td>
+                    {user.peakHour}
+                    <span className="muted small"> · {user.peakHourAccesses}</span>
+                  </td>
+                  <td>
+                    {formatWeekdayLabel(user.peakWeekday)}
+                    <span className="muted small"> · {user.peakWeekdayAccesses}</span>
+                  </td>
+                  <td>{user.uniqueReports}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <p className="muted">Nenhum usuário ativo acessou relatórios no período selecionado.</p>
       )}
     </article>
   );
@@ -212,6 +278,20 @@ export default function ReportsAnalyticsPage() {
     [data]
   );
 
+  const categoryItems = useMemo(
+    () =>
+      (data?.categoryRanking || []).slice(0, 10).map((item) => ({
+        key: item.categoryName,
+        label: item.categoryName,
+        value: item.accesses
+      })),
+    [data]
+  );
+
+  const accessedReportsSummary = data?.summary
+    ? `${data.summary.accessedReports}/${data.summary.activeReports} (${data.summary.accessedReportsRate}%)`
+    : "0/0 (0%)";
+
   return (
     <div className="page-stack">
       <section className="page-card admin-toolbar-card">
@@ -256,11 +336,19 @@ export default function ReportsAnalyticsPage() {
         <MetricCard
           label="Usuários ativos"
           value={data?.summary?.activeUsers ?? 0}
-          hint="Logaram e abriram pelo menos um relatório no período."
+          hint="Usuários ativos que acessaram pelo menos um relatório no período."
         />
         <MetricCard label="Acessos a relatórios" value={data?.summary?.totalViews ?? 0} />
-        <MetricCard label="Relatórios acessados" value={data?.summary?.uniqueReports ?? 0} />
-        <MetricCard label="Fuso horário" value="Fortaleza" hint="Métricas agregadas em America/Fortaleza." />
+        <MetricCard
+          label="Relatórios acessados"
+          value={accessedReportsSummary}
+          hint="Quantidade acessada no período sobre o total de relatórios ativos."
+        />
+        <MetricCard
+          label="Tempo médio geral"
+          value={formatMinutes(data?.summary?.averageMinutesOverall)}
+          hint="Tempo estimado médio entre aberturas de relatórios."
+        />
       </section>
 
       <section className="analytics-grid">
@@ -287,6 +375,16 @@ export default function ReportsAnalyticsPage() {
           items={weekdayItems}
           valueFormatter={(value) => `${value} acesso(s)`}
           labelFormatter={formatWeekdayShort}
+        />
+      </section>
+
+      <section className="analytics-grid">
+        <UserStatsTable users={data?.userStats || []} />
+        <BarList
+          title="Categorias mais acessadas"
+          items={categoryItems}
+          valueFormatter={(value) => `${value} acesso(s)`}
+          labelFormatter={(label) => label}
         />
       </section>
     </div>
