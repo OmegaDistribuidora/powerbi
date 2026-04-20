@@ -159,7 +159,12 @@ function DualVerticalBarChart({ title, items, labelFormatter, minWidth = 760 }) 
   const topPadding = 18;
   const bottomPadding = 62;
   const groupWidth = barWidth * 2 + innerGap;
-  const chartWidth = Math.max(minWidth, leftPadding + rightPadding + items.length * (groupWidth + groupGap));
+  const contentWidth =
+    leftPadding +
+    rightPadding +
+    items.length * groupWidth +
+    Math.max(0, items.length - 1) * groupGap;
+  const chartWidth = Math.max(minWidth, contentWidth);
   const maxValue = Math.max(
     1,
     ...items.flatMap((item) => [item.reportAccesses || 0, item.logins || 0])
