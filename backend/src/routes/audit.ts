@@ -10,6 +10,8 @@ const auditQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).default(30)
 });
 
+const LOGIN_ACTIONS = ["LOGIN", "SSO_LOGIN"] as const;
+
 function buildPeriodWhere(period: "today" | "week") {
   const now = new Date();
 
@@ -28,7 +30,9 @@ export async function registerAuditRoutes(app: FastifyInstance): Promise<void> {
     const query = auditQuerySchema.parse(request.query ?? {});
     const where = {
       createdAt: buildPeriodWhere(query.period),
-      ...(query.kind === "logins" ? { action: "LOGIN" } : { action: { not: "LOGIN" } })
+      ...(query.kind === "logins"
+        ? { action: { in: [...LOGIN_ACTIONS] } }
+        : { action: { notIn: [...LOGIN_ACTIONS] } })
     } as const;
 
     const [logs, total] = await Promise.all([

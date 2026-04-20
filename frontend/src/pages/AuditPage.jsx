@@ -4,6 +4,7 @@ import { apiJson } from "../services/api";
 
 const FORTALEZA_TZ = "America/Fortaleza";
 const PAGE_SIZE = 30;
+const LOGIN_ACTIONS = new Set(["LOGIN", "SSO_LOGIN"]);
 
 function EyeIcon() {
   return (
@@ -17,7 +18,7 @@ function EyeIcon() {
 }
 
 function isLoginEvent(log) {
-  return log.action === "LOGIN";
+  return LOGIN_ACTIONS.has(log.action);
 }
 
 function isViewReportEvent(log) {
@@ -33,7 +34,7 @@ function shouldShowBefore(log) {
 }
 
 function actionTone(action) {
-  if (action === "LOGIN") return "is-login";
+  if (LOGIN_ACTIONS.has(action)) return "is-login";
   if (action === "VIEW_REPORT") return "is-view";
   if (action.includes("PASSWORD")) return "is-password";
   if (action.includes("CATEGORY")) return "is-category";

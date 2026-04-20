@@ -1406,9 +1406,23 @@ label {
   gap: 14px;
 }
 
+.analytics-stack {
+  display: grid;
+  gap: 14px;
+}
+
 .analytics-card {
   display: grid;
   gap: 12px;
+  align-content: start;
+}
+
+.analytics-card-compact {
+  min-height: 100%;
+}
+
+.analytics-full-span {
+  width: 100%;
 }
 
 .analytics-table-wrap {
@@ -1439,6 +1453,7 @@ label {
 .analytics-list {
   display: grid;
   gap: 12px;
+  align-content: start;
 }
 
 .analytics-row {
@@ -1463,8 +1478,8 @@ label {
 
 .analytics-chart {
   width: 100%;
-  min-width: 320px;
-  height: 250px;
+  min-width: 420px;
+  height: 270px;
 }
 
 .analytics-grid-line {
@@ -1474,8 +1489,16 @@ label {
 
 .analytics-axis-text {
   fill: rgba(220, 232, 255, 0.72);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
+}
+
+.analytics-axis-x {
+  font-size: 13px;
+}
+
+.analytics-axis-y {
+  font-size: 12px;
 }
 
 .analytics-bar-track {
@@ -1493,6 +1516,39 @@ label {
 
 .analytics-bar-vertical {
   fill: rgba(255, 123, 44, 0.92);
+}
+
+.analytics-user-list {
+  display: grid;
+  gap: 10px;
+}
+
+.analytics-user-card {
+  display: grid;
+  grid-template-columns: minmax(150px, 1.1fr) repeat(4, minmax(120px, 0.7fr)) minmax(110px, 0.55fr);
+  gap: 12px;
+  align-items: start;
+  padding: 14px;
+  border-radius: 18px;
+  border: 1px solid rgba(133, 167, 255, 0.12);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.analytics-user-primary,
+.analytics-user-metric {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.analytics-user-primary strong,
+.analytics-user-metric strong {
+  min-width: 0;
+  word-break: break-word;
+}
+
+.analytics-user-metric-wide {
+  min-width: 0;
 }
 
 pre {
@@ -1540,6 +1596,10 @@ code {
   .analytics-metrics-grid,
   .analytics-grid {
     grid-template-columns: 1fr;
+  }
+
+  .analytics-user-card {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .admin-shell-layout {
@@ -1621,5 +1681,15 @@ code {
 
   .dashboard-home-card {
     width: 100%;
+  }
+}
+
+@media (max-width: 640px) {
+  .analytics-user-card {
+    grid-template-columns: 1fr;
+  }
+
+  .analytics-chart {
+    min-width: 540px;
   }
 }

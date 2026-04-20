@@ -211,6 +211,66 @@ function Modal({ title, children, onClose }) {
   );
 }
 
+function ConfirmDeleteCategoryModal({ category, onCancel, onConfirm, loading }) {
+  const reports = category?.reports || [];
+
+  return (
+    <div className="modal-backdrop" role="presentation" onClick={loading ? undefined : onCancel}>
+      <section
+        className="modal-card modal-card-sm"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Confirmar exclusao de categoria"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div className="modal-header">
+          <div>
+            <div className="eyebrow">Administracao</div>
+            <h2>Excluir categoria</h2>
+          </div>
+          <button type="button" className="icon-btn" onClick={onCancel} aria-label="Fechar" disabled={loading}>
+            x
+          </button>
+        </div>
+
+        <div className="form-stack compact">
+          <p>
+            Voce esta excluindo a categoria <strong>{category?.name}</strong>.
+          </p>
+          <p className="muted small">
+            Esta acao tambem vai excluir os seguintes paineis vinculados a ela:
+          </p>
+
+          {reports.length ? (
+            <div className="tag-list">
+              {reports.map((report) => (
+                <span key={`${category?.id}-${report.id}`} className="tag-chip">
+                  {report.name}
+                </span>
+              ))}
+            </div>
+          ) : (
+            <p className="muted small">Esta categoria nao possui paineis vinculados.</p>
+          )}
+
+          <p>
+            <strong>Confirma?</strong>
+          </p>
+
+          <div className="modal-actions">
+            <button type="button" className="secondary-btn" onClick={onCancel} disabled={loading}>
+              Cancelar
+            </button>
+            <button type="button" className="secondary-btn danger-btn" onClick={onConfirm} disabled={loading}>
+              {loading ? "Excluindo..." : "Excluir categoria"}
+            </button>
+          </div>
+        </div>
+      </section>
+    </div>
+  );
+}
+
 export default function AdminPage() {
   const { token, user: authUser } = useAuth();
   const [homeCards, setHomeCards] = useState([]);
@@ -231,6 +291,8 @@ export default function AdminPage() {
   const [userModalOpen, setUserModalOpen] = useState(false);
   const [reportModalOpen, setReportModalOpen] = useState(false);
   const [categoryModalOpen, setCategoryModalOpen] = useState(false);
+  const [categoryDeleteTarget, setCategoryDeleteTarget] = useState(null);
+  const [categoryDeleteLoading, setCategoryDeleteLoading] = useState(false);
   const [activeSection, setActiveSection] = useState("categories");
   const [userProfileFilter, setUserProfileFilter] = useState("ALL");
   const [reportCategoryFilter, setReportCategoryFilter] = useState("ALL");
@@ -526,6 +588,18 @@ export default function AdminPage() {
     setCategoryModalOpen(false);
     setEditingCategoryId(null);
     setCategoryForm(emptyCategory);
+    setCategoryDeleteTarget(null);
+  }
+
+  function openDeleteCategoryModal(category) {
+    setCategoryDeleteTarget(category);
+  }
+
+  function closeDeleteCategoryModal() {
+    if (categoryDeleteLoading) {
+      return;
+    }
+    setCategoryDeleteTarget(null);
   }
 
   function openNewUserModal() {
@@ -933,6 +1007,7 @@ export default function AdminPage() {
   function startEditingCategory(category) {
     setError("");
     setNotice("");
+    setCategoryDeleteTarget(null);
     setEditingCategoryId(category.id);
     setCategoryForm({
       name: category.name,
@@ -1372,6 +1447,31 @@ export default function AdminPage() {
       setNotice("Painel excluído com sucesso.");
     } catch (requestError) {
       setError(requestError.message);
+    }
+  }
+
+  async function deleteCategory() {
+    if (!editingCategoryId || !categoryDeleteTarget) {
+      return;
+    }
+
+    setError("");
+    setNotice("");
+    setCategoryDeleteLoading(true);
+
+    try {
+      await apiJson(`/report-categories/${editingCategoryId}`, {
+        token,
+        method: "DELETE"
+      });
+      await loadData();
+      closeCategoryModal();
+      setCategoryDeleteTarget(null);
+      setNotice("Categoria excluida com sucesso.");
+    } catch (requestError) {
+      setError(requestError.message);
+    } finally {
+      setCategoryDeleteLoading(false);
     }
   }
 
@@ -2329,9 +2429,29 @@ export default function AdminPage() {
               <button type="button" className="secondary-btn" onClick={closeCategoryModal}>
                 Cancelar
               </button>
+              {editingCategoryId ? (
+                <button
+                  type="button"
+                  className="secondary-btn danger-btn"
+                  onClick={() =>
+                    openDeleteCategoryModal(categories.find((category) => category.id === editingCategoryId) || null)
+                  }
+                >
+                  Excluir
+                </button>
+              ) : null}
             </div>
           </form>
         </Modal>
+      ) : null}
+
+      {categoryDeleteTarget ? (
+        <ConfirmDeleteCategoryModal
+          category={categoryDeleteTarget}
+          onCancel={closeDeleteCategoryModal}
+          onConfirm={deleteCategory}
+          loading={categoryDeleteLoading}
+        />
       ) : null}
     </div>
   );

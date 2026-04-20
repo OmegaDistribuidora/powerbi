@@ -10,11 +10,13 @@ function formatWeekdayShort(value) {
   const normalized = value.toLowerCase();
   const mapping = {
     "segunda-feira": "Seg",
+    "terca-feira": "Ter",
     "terça-feira": "Ter",
     "quarta-feira": "Qua",
     "quinta-feira": "Qui",
     "sexta-feira": "Sex",
-    sábado: "Sáb",
+    sabado: "Sab",
+    "sábado": "Sab",
     domingo: "Dom"
   };
 
@@ -27,6 +29,22 @@ function formatMinutes(value) {
   }
 
   return `${String(value).replace(".", ",")} min`;
+}
+
+function formatAccessLabel(value) {
+  return `${value} ${value === 1 ? "acesso" : "acessos"}`;
+}
+
+function buildChartTooltip(item, valueFormatter, labelFormatter) {
+  const lines = [`${labelFormatter(item.label)}: ${valueFormatter(item.value)}`];
+
+  if (item.users?.length) {
+    item.users.forEach((user) => {
+      lines.push(`${user.displayName}: ${formatAccessLabel(user.accesses)}`);
+    });
+  }
+
+  return lines.join("\n");
 }
 
 function MetricCard({ label, value, hint }) {
@@ -43,7 +61,7 @@ function BarList({ title, items, valueFormatter, labelFormatter }) {
   const maxValue = Math.max(1, ...items.map((item) => item.value));
 
   return (
-    <article className="page-card analytics-card">
+    <article className="page-card analytics-card analytics-card-compact">
       <div className="header-line">
         <h2>{title}</h2>
       </div>
@@ -64,7 +82,7 @@ function BarList({ title, items, valueFormatter, labelFormatter }) {
             </div>
           ))
         ) : (
-          <p className="muted">Nenhum dado disponível no período selecionado.</p>
+          <p className="muted">Nenhum dado disponivel no periodo selecionado.</p>
         )}
       </div>
     </article>
@@ -72,18 +90,18 @@ function BarList({ title, items, valueFormatter, labelFormatter }) {
 }
 
 function VerticalBarChart({ title, items, valueFormatter, labelFormatter }) {
-  const chartHeight = 180;
-  const barWidth = 22;
-  const gap = 10;
-  const leftPadding = 24;
-  const rightPadding = 12;
+  const chartHeight = 190;
+  const barWidth = 24;
+  const gap = 12;
+  const leftPadding = 38;
+  const rightPadding = 18;
   const topPadding = 18;
-  const bottomPadding = 42;
-  const chartWidth = Math.max(320, leftPadding + rightPadding + items.length * (barWidth + gap));
+  const bottomPadding = 54;
+  const chartWidth = Math.max(420, leftPadding + rightPadding + items.length * (barWidth + gap));
   const maxValue = Math.max(1, ...items.map((item) => item.value));
 
   return (
-    <article className="page-card analytics-card">
+    <article className="page-card analytics-card analytics-card-compact">
       <div className="header-line">
         <h2>{title}</h2>
       </div>
@@ -101,13 +119,13 @@ function VerticalBarChart({ title, items, valueFormatter, labelFormatter }) {
               return (
                 <g key={tick}>
                   <line
-                    x1={leftPadding - 6}
+                    x1={leftPadding - 8}
                     y1={y}
                     x2={chartWidth - rightPadding}
                     y2={y}
                     className="analytics-grid-line"
                   />
-                  <text x={0} y={y + 4} className="analytics-axis-text">
+                  <text x={0} y={y + 4} className="analytics-axis-text analytics-axis-y">
                     {tickValue}
                   </text>
                 </g>
@@ -120,7 +138,7 @@ function VerticalBarChart({ title, items, valueFormatter, labelFormatter }) {
               const y = topPadding + chartHeight - height;
               return (
                 <g key={item.key}>
-                  <title>{`${labelFormatter(item.label)}: ${valueFormatter(item.value)}`}</title>
+                  <title>{buildChartTooltip(item, valueFormatter, labelFormatter)}</title>
                   <rect
                     x={x}
                     y={y}
@@ -131,9 +149,9 @@ function VerticalBarChart({ title, items, valueFormatter, labelFormatter }) {
                   />
                   <text
                     x={x + barWidth / 2}
-                    y={topPadding + chartHeight + 18}
+                    y={topPadding + chartHeight + 20}
                     textAnchor="middle"
-                    className="analytics-axis-text"
+                    className="analytics-axis-text analytics-axis-x"
                   >
                     {labelFormatter(item.label)}
                   </text>
@@ -143,7 +161,7 @@ function VerticalBarChart({ title, items, valueFormatter, labelFormatter }) {
           </svg>
         </div>
       ) : (
-        <p className="muted">Nenhum dado disponível no período selecionado.</p>
+        <p className="muted">Nenhum dado disponivel no periodo selecionado.</p>
       )}
     </article>
   );
@@ -151,50 +169,46 @@ function VerticalBarChart({ title, items, valueFormatter, labelFormatter }) {
 
 function UserStatsTable({ users }) {
   return (
-    <article className="page-card analytics-card">
+    <article className="page-card analytics-card analytics-full-span">
       <div className="header-line">
-        <h2>Dados por usuário</h2>
+        <h2>Dados por usuario</h2>
       </div>
       {users.length ? (
-        <div className="analytics-table-wrap">
-          <table className="analytics-table">
-            <thead>
-              <tr>
-                <th>Usuário</th>
-                <th>Perfil</th>
-                <th>Total de acessos</th>
-                <th>Painel mais acessado</th>
-                <th>Hora de pico</th>
-                <th>Dia de pico</th>
-                <th>Painéis distintos</th>
-              </tr>
-            </thead>
-            <tbody>
-              {users.map((user) => (
-                <tr key={user.userId}>
-                  <td>{user.displayName}</td>
-                  <td>{user.profileLabel || "Sem perfil"}</td>
-                  <td>{user.totalViews}</td>
-                  <td>
-                    {user.topReportName}
-                    <span className="muted small"> · {user.topReportAccesses} acesso(s)</span>
-                  </td>
-                  <td>
-                    {user.peakHour}
-                    <span className="muted small"> · {user.peakHourAccesses}</span>
-                  </td>
-                  <td>
-                    {formatWeekdayLabel(user.peakWeekday)}
-                    <span className="muted small"> · {user.peakWeekdayAccesses}</span>
-                  </td>
-                  <td>{user.uniqueReports}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <div className="analytics-user-list">
+          {users.map((user) => (
+            <article key={user.userId} className="analytics-user-card">
+              <div className="analytics-user-primary">
+                <strong>{user.displayName}</strong>
+                <span className="muted small">{user.profileLabel || "Sem perfil"}</span>
+              </div>
+              <div className="analytics-user-metric">
+                <span className="muted small">Total de acessos</span>
+                <strong>{user.totalViews}</strong>
+              </div>
+              <div className="analytics-user-metric analytics-user-metric-wide">
+                <span className="muted small">Painel mais acessado</span>
+                <strong>{user.topReportName}</strong>
+                <span className="muted small">{formatAccessLabel(user.topReportAccesses)}</span>
+              </div>
+              <div className="analytics-user-metric">
+                <span className="muted small">Hora de pico</span>
+                <strong>{user.peakHour}</strong>
+                <span className="muted small">{formatAccessLabel(user.peakHourAccesses)}</span>
+              </div>
+              <div className="analytics-user-metric">
+                <span className="muted small">Dia de pico</span>
+                <strong>{formatWeekdayLabel(user.peakWeekday)}</strong>
+                <span className="muted small">{formatAccessLabel(user.peakWeekdayAccesses)}</span>
+              </div>
+              <div className="analytics-user-metric">
+                <span className="muted small">Paineis distintos</span>
+                <strong>{user.uniqueReports}</strong>
+              </div>
+            </article>
+          ))}
         </div>
       ) : (
-        <p className="muted">Nenhum usuário ativo acessou relatórios no período selecionado.</p>
+        <p className="muted">Nenhum usuario ativo acessou relatorios no periodo selecionado.</p>
       )}
     </article>
   );
@@ -263,7 +277,8 @@ export default function ReportsAnalyticsPage() {
       (data?.accessesByHour || []).map((item) => ({
         key: String(item.hour),
         label: `${String(item.hour).padStart(2, "0")}h`,
-        value: item.accesses
+        value: item.accesses,
+        users: item.users || []
       })),
     [data]
   );
@@ -273,7 +288,8 @@ export default function ReportsAnalyticsPage() {
       (data?.accessesByWeekday || []).map((item) => ({
         key: item.weekday,
         label: item.weekday,
-        value: item.accesses
+        value: item.accesses,
+        users: item.users || []
       })),
     [data]
   );
@@ -297,7 +313,7 @@ export default function ReportsAnalyticsPage() {
       <section className="page-card admin-toolbar-card">
         <div className="header-line">
           <div className="admin-toolbar-copy">
-            <div className="eyebrow">Relatórios</div>
+            <div className="eyebrow">Relatorios</div>
             <h1>Indicadores de uso</h1>
           </div>
           <form
@@ -308,7 +324,7 @@ export default function ReportsAnalyticsPage() {
             }}
           >
             <label>
-              Início
+              Inicio
               <input
                 type="date"
                 value={filters.startDate}
@@ -334,32 +350,32 @@ export default function ReportsAnalyticsPage() {
 
       <section className="analytics-metrics-grid">
         <MetricCard
-          label="Usuários ativos"
+          label="Usuarios ativos"
           value={data?.summary?.activeUsers ?? 0}
-          hint="Usuários ativos que acessaram pelo menos um relatório no período."
+          hint="Usuarios ativos que acessaram pelo menos um relatorio no periodo."
         />
-        <MetricCard label="Acessos a relatórios" value={data?.summary?.totalViews ?? 0} />
+        <MetricCard label="Acessos a relatorios" value={data?.summary?.totalViews ?? 0} />
         <MetricCard
-          label="Relatórios acessados"
+          label="Relatorios acessados"
           value={accessedReportsSummary}
-          hint="Quantidade acessada no período sobre o total de relatórios ativos."
+          hint="Quantidade acessada no periodo sobre o total de relatorios ativos."
         />
         <MetricCard
-          label="Tempo médio geral"
+          label="Tempo medio geral"
           value={formatMinutes(data?.summary?.averageMinutesOverall)}
-          hint="Tempo estimado médio entre aberturas de relatórios."
+          hint="Tempo estimado medio entre aberturas de relatorios."
         />
       </section>
 
       <section className="analytics-grid">
         <BarList
-          title="Ranking de relatórios mais acessados"
+          title="Ranking de relatorios mais acessados"
           items={rankingItems}
-          valueFormatter={(value) => `${value} acesso(s)`}
+          valueFormatter={formatAccessLabel}
           labelFormatter={(label) => label}
         />
         <BarList
-          title="Tempo médio estimado por relatório"
+          title="Tempo medio estimado por relatorio"
           items={averageItems}
           valueFormatter={formatMinutes}
           labelFormatter={(label) => label}
@@ -367,23 +383,23 @@ export default function ReportsAnalyticsPage() {
         <VerticalBarChart
           title="Acessos por hora"
           items={hourItems}
-          valueFormatter={(value) => `${value} acesso(s)`}
+          valueFormatter={formatAccessLabel}
           labelFormatter={(label) => label}
         />
         <VerticalBarChart
           title="Acessos por dia da semana"
           items={weekdayItems}
-          valueFormatter={(value) => `${value} acesso(s)`}
+          valueFormatter={formatAccessLabel}
           labelFormatter={formatWeekdayShort}
         />
       </section>
 
-      <section className="analytics-grid">
+      <section className="analytics-stack">
         <UserStatsTable users={data?.userStats || []} />
         <BarList
           title="Categorias mais acessadas"
           items={categoryItems}
-          valueFormatter={(value) => `${value} acesso(s)`}
+          valueFormatter={formatAccessLabel}
           labelFormatter={(label) => label}
         />
       </section>

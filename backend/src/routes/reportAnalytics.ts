@@ -31,6 +31,12 @@ type ReportRef = {
   } | null;
 };
 
+type AccessBreakdown = {
+  userId: number;
+  displayName: string;
+  accesses: number;
+};
+
 function parseFortalezaDateRange(startDate: string, endDate: string) {
   const start = new Date(`${startDate}T00:00:00-03:00`);
   const end = new Date(`${endDate}T23:59:59.999-03:00`);
@@ -111,6 +117,10 @@ function average(values: number[]) {
   }
 
   return Math.round((values.reduce((sum, value) => sum + value, 0) / values.length) * 10) / 10;
+}
+
+function sortBreakdown(entries: Map<number, AccessBreakdown>) {
+  return Array.from(entries.values()).sort((a, b) => b.accesses - a.accesses || a.displayName.localeCompare(b.displayName));
 }
 
 export async function registerReportAnalyticsRoutes(app: FastifyInstance): Promise<void> {
@@ -200,6 +210,8 @@ export async function registerReportAnalyticsRoutes(app: FastifyInstance): Promi
     const accessesByHour = Array.from({ length: 24 }, (_, hour) => ({ hour, accesses: 0 }));
     const weekdaySeed = ["segunda-feira", "terça-feira", "quarta-feira", "quinta-feira", "sexta-feira", "sábado", "domingo"];
     const accessesByWeekdayMap = new Map(weekdaySeed.map((weekday) => [weekday, 0]));
+    const accessesByHourUsers = Array.from({ length: 24 }, () => new Map<number, AccessBreakdown>());
+    const accessesByWeekdayUsers = new Map(weekdaySeed.map((weekday) => [weekday, new Map<number, AccessBreakdown>()]));
     const durationsByReport = estimateSessionDurations(viewLogs as ViewLog[]);
     const userStatsMap = new Map<
       number,
@@ -257,6 +269,26 @@ export async function registerReportAnalyticsRoutes(app: FastifyInstance): Promi
         userStats.hourCounts[hour] += 1;
         userStats.weekdayCounts.set(weekday, (userStats.weekdayCounts.get(weekday) || 0) + 1);
 
+        const hourUsers = accessesByHourUsers[hour];
+        const hourUserBreakdown = hourUsers.get(activeUser.id) || {
+          userId: activeUser.id,
+          displayName: activeUser.displayName,
+          accesses: 0
+        };
+        hourUserBreakdown.accesses += 1;
+        hourUsers.set(activeUser.id, hourUserBreakdown);
+
+        const weekdayUsers = accessesByWeekdayUsers.get(weekday);
+        if (weekdayUsers) {
+          const weekdayUserBreakdown = weekdayUsers.get(activeUser.id) || {
+            userId: activeUser.id,
+            displayName: activeUser.displayName,
+            accesses: 0
+          };
+          weekdayUserBreakdown.accesses += 1;
+          weekdayUsers.set(activeUser.id, weekdayUserBreakdown);
+        }
+
         const reportEntry = userStats.reportCounts.get(reportId) || {
           reportId,
           reportName,
@@ -281,7 +313,8 @@ export async function registerReportAnalyticsRoutes(app: FastifyInstance): Promi
 
     const accessesByWeekday = weekdaySeed.map((weekday) => ({
       weekday,
-      accesses: accessesByWeekdayMap.get(weekday) || 0
+      accesses: accessesByWeekdayMap.get(weekday) || 0,
+      users: sortBreakdown(accessesByWeekdayUsers.get(weekday) || new Map())
     }));
 
     const userStats = Array.from(userStatsMap.values())
@@ -344,7 +377,10 @@ export async function registerReportAnalyticsRoutes(app: FastifyInstance): Promi
         reportName: report.reportName,
         averageMinutes: report.averageMinutes
       })),
-      accessesByHour,
+      accessesByHour: accessesByHour.map((item) => ({
+        ...item,
+        users: sortBreakdown(accessesByHourUsers[item.hour])
+      })),
       accessesByWeekday,
       userStats,
       categoryRanking
