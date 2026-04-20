@@ -1390,6 +1390,10 @@ label {
   gap: 14px;
 }
 
+.analytics-metrics-grid-wide {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
 .analytics-metric-card {
   display: grid;
   gap: 8px;
@@ -1473,6 +1477,7 @@ label {
 }
 
 .analytics-chart-shell {
+  position: relative;
   overflow-x: auto;
 }
 
@@ -1480,6 +1485,33 @@ label {
   width: 100%;
   min-width: 420px;
   height: 270px;
+}
+
+.analytics-legend {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.analytics-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.analytics-legend-swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+}
+
+.analytics-legend-swatch-primary {
+  background: rgba(255, 123, 44, 0.92);
+}
+
+.analytics-legend-swatch-secondary {
+  background: rgba(108, 163, 255, 0.92);
 }
 
 .analytics-grid-line {
@@ -1518,6 +1550,78 @@ label {
   fill: rgba(255, 123, 44, 0.92);
 }
 
+.analytics-bar-vertical-secondary {
+  fill: rgba(108, 163, 255, 0.92);
+}
+
+.analytics-tooltip {
+  position: absolute;
+  z-index: 4;
+  min-width: 240px;
+  max-width: 320px;
+  padding: 12px 14px;
+  border-radius: 16px;
+  border: 1px solid rgba(133, 167, 255, 0.2);
+  background: linear-gradient(180deg, rgba(9, 21, 42, 0.97), rgba(7, 18, 38, 0.97));
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.35);
+  pointer-events: none;
+  transform: translateY(-100%);
+  backdrop-filter: blur(10px);
+}
+
+.analytics-tooltip-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 6px;
+}
+
+.analytics-tooltip-accent {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 3px 8px;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.analytics-tooltip-accent-report {
+  background: rgba(255, 123, 44, 0.12);
+  color: #ffd6be;
+}
+
+.analytics-tooltip-accent-login {
+  background: rgba(108, 163, 255, 0.14);
+  color: #dce9ff;
+}
+
+.analytics-tooltip-summary {
+  margin-bottom: 10px;
+  color: var(--text);
+  font-weight: 700;
+}
+
+.analytics-tooltip-list {
+  display: grid;
+  gap: 6px;
+}
+
+.analytics-tooltip-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--muted);
+  font-size: 0.84rem;
+}
+
+.analytics-tooltip-empty {
+  color: var(--muted);
+  font-size: 0.84rem;
+}
+
 .analytics-user-list {
   display: grid;
   gap: 10px;
@@ -1525,7 +1629,6 @@ label {
 
 .analytics-user-card {
   display: grid;
-  grid-template-columns: minmax(150px, 1.1fr) repeat(4, minmax(120px, 0.7fr)) minmax(110px, 0.55fr);
   gap: 12px;
   align-items: start;
   padding: 14px;
@@ -1534,21 +1637,39 @@ label {
   background: rgba(255, 255, 255, 0.03);
 }
 
-.analytics-user-primary,
-.analytics-user-metric {
+.analytics-user-header {
+  display: grid;
+  align-content: start;
+  gap: 4px;
+}
+
+.analytics-user-header strong {
+  font-size: 1rem;
+}
+
+.analytics-user-metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 10px;
+}
+
+.analytics-user-metric-box {
   display: grid;
   gap: 4px;
+  padding: 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(133, 167, 255, 0.1);
+  background: rgba(255, 255, 255, 0.03);
   min-width: 0;
 }
 
-.analytics-user-primary strong,
-.analytics-user-metric strong {
+.analytics-user-metric-box strong {
   min-width: 0;
   word-break: break-word;
 }
 
-.analytics-user-metric-wide {
-  min-width: 0;
+.analytics-user-metric-box-wide {
+  grid-column: span 2;
 }
 
 pre {
@@ -1598,7 +1719,7 @@ code {
     grid-template-columns: 1fr;
   }
 
-  .analytics-user-card {
+  .analytics-metrics-grid-wide {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
@@ -1685,8 +1806,16 @@ code {
 }
 
 @media (max-width: 640px) {
-  .analytics-user-card {
+  .analytics-metrics-grid-wide {
     grid-template-columns: 1fr;
+  }
+
+  .analytics-user-metrics-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .analytics-user-metric-box-wide {
+    grid-column: span 1;
   }
 
   .analytics-chart {

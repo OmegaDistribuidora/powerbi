@@ -1,13 +1,26 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "../components/AuthProvider";
 import { apiJson } from "../services/api";
 
 function formatWeekdayLabel(value) {
-  return value.charAt(0).toUpperCase() + value.slice(1);
+  const normalized = String(value || "").toLowerCase();
+  const mapping = {
+    "segunda-feira": "Segunda-feira",
+    "terca-feira": "Terca-feira",
+    "terça-feira": "Terca-feira",
+    "quarta-feira": "Quarta-feira",
+    "quinta-feira": "Quinta-feira",
+    "sexta-feira": "Sexta-feira",
+    sabado: "Sabado",
+    "sábado": "Sabado",
+    domingo: "Domingo"
+  };
+
+  return mapping[normalized] || value;
 }
 
 function formatWeekdayShort(value) {
-  const normalized = value.toLowerCase();
+  const normalized = String(value || "").toLowerCase();
   const mapping = {
     "segunda-feira": "Seg",
     "terca-feira": "Ter",
@@ -20,7 +33,7 @@ function formatWeekdayShort(value) {
     domingo: "Dom"
   };
 
-  return mapping[normalized] || formatWeekdayLabel(value);
+  return mapping[normalized] || value;
 }
 
 function formatMinutes(value) {
@@ -31,20 +44,29 @@ function formatMinutes(value) {
   return `${String(value).replace(".", ",")} min`;
 }
 
-function formatAccessLabel(value) {
-  return `${value} ${value === 1 ? "acesso" : "acessos"}`;
+function formatCount(value, singular, plural = `${singular}s`) {
+  return `${value} ${value === 1 ? singular : plural}`;
 }
 
-function buildChartTooltip(item, valueFormatter, labelFormatter) {
-  const lines = [`${labelFormatter(item.label)}: ${valueFormatter(item.value)}`];
+function formatAccessLabel(value) {
+  return formatCount(value, "abertura", "aberturas");
+}
 
-  if (item.users?.length) {
-    item.users.forEach((user) => {
-      lines.push(`${user.displayName}: ${formatAccessLabel(user.accesses)}`);
-    });
-  }
+function formatLoginLabel(value) {
+  return formatCount(value, "login", "logins");
+}
 
-  return lines.join("\n");
+function buildSeriesTooltipData({ item, itemLabel, seriesLabel, total, users, totalFormatter }) {
+  return {
+    title: itemLabel,
+    accent: seriesLabel,
+    tone: seriesLabel === "Login" ? "login" : "report",
+    summary: totalFormatter(total),
+    lines: (users || []).map((user) => ({
+      label: user.displayName,
+      value: formatCount(user.accesses, seriesLabel.toLowerCase(), `${seriesLabel.toLowerCase()}s`)
+    }))
+  };
 }
 
 function MetricCard({ label, value, hint }) {
@@ -57,13 +79,14 @@ function MetricCard({ label, value, hint }) {
   );
 }
 
-function BarList({ title, items, valueFormatter, labelFormatter }) {
+function BarList({ title, items, valueFormatter, labelFormatter, meta }) {
   const maxValue = Math.max(1, ...items.map((item) => item.value));
 
   return (
     <article className="page-card analytics-card analytics-card-compact">
       <div className="header-line">
         <h2>{title}</h2>
+        {meta ? <span className="tag-chip tag-chip-muted">{meta}</span> : null}
       </div>
       <div className="analytics-list">
         {items.length ? (
@@ -89,24 +112,54 @@ function BarList({ title, items, valueFormatter, labelFormatter }) {
   );
 }
 
-function VerticalBarChart({ title, items, valueFormatter, labelFormatter }) {
+function DualVerticalBarChart({ title, items, labelFormatter }) {
+  const shellRef = useRef(null);
+  const [tooltip, setTooltip] = useState(null);
   const chartHeight = 190;
-  const barWidth = 24;
-  const gap = 12;
+  const barWidth = 16;
+  const innerGap = 6;
+  const groupGap = 14;
   const leftPadding = 38;
   const rightPadding = 18;
   const topPadding = 18;
-  const bottomPadding = 54;
-  const chartWidth = Math.max(420, leftPadding + rightPadding + items.length * (barWidth + gap));
-  const maxValue = Math.max(1, ...items.map((item) => item.value));
+  const bottomPadding = 56;
+  const groupWidth = barWidth * 2 + innerGap;
+  const chartWidth = Math.max(420, leftPadding + rightPadding + items.length * (groupWidth + groupGap));
+  const maxValue = Math.max(
+    1,
+    ...items.flatMap((item) => [item.reportAccesses || 0, item.logins || 0])
+  );
+
+  function handleTooltipMove(event, payload) {
+    const shellRect = shellRef.current?.getBoundingClientRect();
+    if (!shellRect) {
+      return;
+    }
+
+    setTooltip({
+      ...payload,
+      x: event.clientX - shellRect.left + 16,
+      y: event.clientY - shellRect.top - 16
+    });
+  }
 
   return (
     <article className="page-card analytics-card analytics-card-compact">
       <div className="header-line">
         <h2>{title}</h2>
+        <div className="analytics-legend">
+          <span className="analytics-legend-item">
+            <span className="analytics-legend-swatch analytics-legend-swatch-primary" />
+            <span className="muted small">Aberturas</span>
+          </span>
+          <span className="analytics-legend-item">
+            <span className="analytics-legend-swatch analytics-legend-swatch-secondary" />
+            <span className="muted small">Logins</span>
+          </span>
+        </div>
       </div>
       {items.length ? (
-        <div className="analytics-chart-shell">
+        <div className="analytics-chart-shell" ref={shellRef}>
           <svg
             className="analytics-chart"
             viewBox={`0 0 ${chartWidth} ${chartHeight + topPadding + bottomPadding}`}
@@ -133,32 +186,124 @@ function VerticalBarChart({ title, items, valueFormatter, labelFormatter }) {
             })}
 
             {items.map((item, index) => {
-              const height = maxValue ? (item.value / maxValue) * chartHeight : 0;
-              const x = leftPadding + index * (barWidth + gap);
-              const y = topPadding + chartHeight - height;
+              const groupX = leftPadding + index * (groupWidth + groupGap);
+              const reportHeight = maxValue ? ((item.reportAccesses || 0) / maxValue) * chartHeight : 0;
+              const loginHeight = maxValue ? ((item.logins || 0) / maxValue) * chartHeight : 0;
+              const reportY = topPadding + chartHeight - reportHeight;
+              const loginY = topPadding + chartHeight - loginHeight;
+              const itemLabel = labelFormatter(item.label);
+
               return (
                 <g key={item.key}>
-                  <title>{buildChartTooltip(item, valueFormatter, labelFormatter)}</title>
                   <rect
-                    x={x}
-                    y={y}
+                    x={groupX}
+                    y={reportY}
                     width={barWidth}
-                    height={Math.max(2, height)}
-                    rx={7}
+                    height={Math.max(2, reportHeight)}
+                    rx={6}
                     className="analytics-bar-vertical"
+                    onMouseEnter={(event) =>
+                      handleTooltipMove(
+                        event,
+                        buildSeriesTooltipData({
+                          item,
+                          itemLabel,
+                          seriesLabel: "Abertura",
+                          total: item.reportAccesses || 0,
+                          users: item.reportUsers || [],
+                          totalFormatter: formatAccessLabel
+                        })
+                      )
+                    }
+                    onMouseMove={(event) =>
+                      handleTooltipMove(
+                        event,
+                        buildSeriesTooltipData({
+                          item,
+                          itemLabel,
+                          seriesLabel: "Abertura",
+                          total: item.reportAccesses || 0,
+                          users: item.reportUsers || [],
+                          totalFormatter: formatAccessLabel
+                        })
+                      )
+                    }
+                    onMouseLeave={() => setTooltip(null)}
+                  />
+                  <rect
+                    x={groupX + barWidth + innerGap}
+                    y={loginY}
+                    width={barWidth}
+                    height={Math.max(2, loginHeight)}
+                    rx={6}
+                    className="analytics-bar-vertical-secondary"
+                    onMouseEnter={(event) =>
+                      handleTooltipMove(
+                        event,
+                        buildSeriesTooltipData({
+                          item,
+                          itemLabel,
+                          seriesLabel: "Login",
+                          total: item.logins || 0,
+                          users: item.loginUsers || [],
+                          totalFormatter: formatLoginLabel
+                        })
+                      )
+                    }
+                    onMouseMove={(event) =>
+                      handleTooltipMove(
+                        event,
+                        buildSeriesTooltipData({
+                          item,
+                          itemLabel,
+                          seriesLabel: "Login",
+                          total: item.logins || 0,
+                          users: item.loginUsers || [],
+                          totalFormatter: formatLoginLabel
+                        })
+                      )
+                    }
+                    onMouseLeave={() => setTooltip(null)}
                   />
                   <text
-                    x={x + barWidth / 2}
+                    x={groupX + groupWidth / 2}
                     y={topPadding + chartHeight + 20}
                     textAnchor="middle"
                     className="analytics-axis-text analytics-axis-x"
                   >
-                    {labelFormatter(item.label)}
+                    {itemLabel}
                   </text>
                 </g>
               );
             })}
           </svg>
+          {tooltip ? (
+            <div
+              className="analytics-tooltip"
+              style={{
+                left: `${tooltip.x}px`,
+                top: `${tooltip.y}px`
+              }}
+            >
+              <div className="analytics-tooltip-header">
+                <strong>{tooltip.title}</strong>
+                <span className={`analytics-tooltip-accent analytics-tooltip-accent-${tooltip.tone}`}>{tooltip.accent}</span>
+              </div>
+              <div className="analytics-tooltip-summary">{tooltip.summary}</div>
+              {tooltip.lines.length ? (
+                <div className="analytics-tooltip-list">
+                  {tooltip.lines.map((line) => (
+                    <div key={`${line.label}-${line.value}`} className="analytics-tooltip-row">
+                      <span>{line.label}</span>
+                      <span>{line.value}</span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="analytics-tooltip-empty">Sem detalhamento por usuario.</div>
+              )}
+            </div>
+          ) : null}
         </div>
       ) : (
         <p className="muted">Nenhum dado disponivel no periodo selecionado.</p>
@@ -177,38 +322,55 @@ function UserStatsTable({ users }) {
         <div className="analytics-user-list">
           {users.map((user) => (
             <article key={user.userId} className="analytics-user-card">
-              <div className="analytics-user-primary">
+              <div className="analytics-user-header">
                 <strong>{user.displayName}</strong>
                 <span className="muted small">{user.profileLabel || "Sem perfil"}</span>
               </div>
-              <div className="analytics-user-metric">
-                <span className="muted small">Total de acessos</span>
-                <strong>{user.totalViews}</strong>
-              </div>
-              <div className="analytics-user-metric analytics-user-metric-wide">
-                <span className="muted small">Painel mais acessado</span>
-                <strong>{user.topReportName}</strong>
-                <span className="muted small">{formatAccessLabel(user.topReportAccesses)}</span>
-              </div>
-              <div className="analytics-user-metric">
-                <span className="muted small">Hora de pico</span>
-                <strong>{user.peakHour}</strong>
-                <span className="muted small">{formatAccessLabel(user.peakHourAccesses)}</span>
-              </div>
-              <div className="analytics-user-metric">
-                <span className="muted small">Dia de pico</span>
-                <strong>{formatWeekdayLabel(user.peakWeekday)}</strong>
-                <span className="muted small">{formatAccessLabel(user.peakWeekdayAccesses)}</span>
-              </div>
-              <div className="analytics-user-metric">
-                <span className="muted small">Paineis distintos</span>
-                <strong>{user.uniqueReports}</strong>
+
+              <div className="analytics-user-metrics-grid">
+                <div className="analytics-user-metric-box">
+                  <span className="muted small">Aberturas de painel</span>
+                  <strong>{user.totalViews}</strong>
+                </div>
+                <div className="analytics-user-metric-box">
+                  <span className="muted small">Logins no sistema</span>
+                  <strong>{user.totalLogins}</strong>
+                </div>
+                <div className="analytics-user-metric-box analytics-user-metric-box-wide">
+                  <span className="muted small">Painel mais acessado</span>
+                  <strong>{user.topReportName}</strong>
+                  <span className="muted small">{formatAccessLabel(user.topReportAccesses)}</span>
+                </div>
+                <div className="analytics-user-metric-box">
+                  <span className="muted small">Hora pico de painel</span>
+                  <strong>{user.peakHour}</strong>
+                  <span className="muted small">{formatAccessLabel(user.peakHourAccesses)}</span>
+                </div>
+                <div className="analytics-user-metric-box">
+                  <span className="muted small">Hora pico de login</span>
+                  <strong>{user.peakLoginHour}</strong>
+                  <span className="muted small">{formatLoginLabel(user.peakLoginHourAccesses)}</span>
+                </div>
+                <div className="analytics-user-metric-box">
+                  <span className="muted small">Dia pico de painel</span>
+                  <strong>{formatWeekdayLabel(user.peakWeekday)}</strong>
+                  <span className="muted small">{formatAccessLabel(user.peakWeekdayAccesses)}</span>
+                </div>
+                <div className="analytics-user-metric-box">
+                  <span className="muted small">Dia pico de login</span>
+                  <strong>{formatWeekdayLabel(user.peakLoginWeekday)}</strong>
+                  <span className="muted small">{formatLoginLabel(user.peakLoginWeekdayAccesses)}</span>
+                </div>
+                <div className="analytics-user-metric-box">
+                  <span className="muted small">Paineis distintos</span>
+                  <strong>{user.uniqueReports}</strong>
+                </div>
               </div>
             </article>
           ))}
         </div>
       ) : (
-        <p className="muted">Nenhum usuario ativo acessou relatorios no periodo selecionado.</p>
+        <p className="muted">Nenhum usuario ativo gerou logins ou aberturas de painel no periodo selecionado.</p>
       )}
     </article>
   );
@@ -277,8 +439,10 @@ export default function ReportsAnalyticsPage() {
       (data?.accessesByHour || []).map((item) => ({
         key: String(item.hour),
         label: `${String(item.hour).padStart(2, "0")}h`,
-        value: item.accesses,
-        users: item.users || []
+        reportAccesses: item.reportAccesses || 0,
+        logins: item.logins || 0,
+        reportUsers: item.reportUsers || [],
+        loginUsers: item.loginUsers || []
       })),
     [data]
   );
@@ -288,8 +452,10 @@ export default function ReportsAnalyticsPage() {
       (data?.accessesByWeekday || []).map((item) => ({
         key: item.weekday,
         label: item.weekday,
-        value: item.accesses,
-        users: item.users || []
+        reportAccesses: item.reportAccesses || 0,
+        logins: item.logins || 0,
+        reportUsers: item.reportUsers || [],
+        loginUsers: item.loginUsers || []
       })),
     [data]
   );
@@ -348,13 +514,22 @@ export default function ReportsAnalyticsPage() {
 
       {error ? <div className="page-card error-text">{error}</div> : null}
 
-      <section className="analytics-metrics-grid">
+      <section className="analytics-metrics-grid analytics-metrics-grid-wide">
         <MetricCard
           label="Usuarios ativos"
           value={data?.summary?.activeUsers ?? 0}
-          hint="Usuarios ativos que acessaram pelo menos um relatorio no periodo."
+          hint="Usuarios ativos que fizeram login e/ou abriram pelo menos um painel no periodo."
         />
-        <MetricCard label="Acessos a relatorios" value={data?.summary?.totalViews ?? 0} />
+        <MetricCard
+          label="Aberturas de painel"
+          value={data?.summary?.totalViews ?? 0}
+          hint="Quantidade total de aberturas de paineis no periodo."
+        />
+        <MetricCard
+          label="Logins no sistema"
+          value={data?.summary?.totalLogins ?? 0}
+          hint="Quantidade total de logins manuais e via SSO no periodo."
+        />
         <MetricCard
           label="Relatorios acessados"
           value={accessedReportsSummary}
@@ -369,38 +544,31 @@ export default function ReportsAnalyticsPage() {
 
       <section className="analytics-grid">
         <BarList
-          title="Ranking de relatorios mais acessados"
+          title="Ranking de paineis mais abertos"
           items={rankingItems}
           valueFormatter={formatAccessLabel}
           labelFormatter={(label) => label}
+          meta={`Logins no periodo: ${formatLoginLabel(data?.summary?.totalLogins ?? 0)}`}
         />
         <BarList
-          title="Tempo medio estimado por relatorio"
+          title="Tempo medio estimado por painel"
           items={averageItems}
           valueFormatter={formatMinutes}
           labelFormatter={(label) => label}
+          meta={`Aberturas no periodo: ${formatAccessLabel(data?.summary?.totalViews ?? 0)}`}
         />
-        <VerticalBarChart
-          title="Acessos por hora"
-          items={hourItems}
-          valueFormatter={formatAccessLabel}
-          labelFormatter={(label) => label}
-        />
-        <VerticalBarChart
-          title="Acessos por dia da semana"
-          items={weekdayItems}
-          valueFormatter={formatAccessLabel}
-          labelFormatter={formatWeekdayShort}
-        />
+        <DualVerticalBarChart title="Uso por hora" items={hourItems} labelFormatter={(label) => label} />
+        <DualVerticalBarChart title="Uso por dia da semana" items={weekdayItems} labelFormatter={formatWeekdayShort} />
       </section>
 
       <section className="analytics-stack">
         <UserStatsTable users={data?.userStats || []} />
         <BarList
-          title="Categorias mais acessadas"
+          title="Categorias mais acessadas por abertura de painel"
           items={categoryItems}
           valueFormatter={formatAccessLabel}
           labelFormatter={(label) => label}
+          meta={`Logins no periodo: ${formatLoginLabel(data?.summary?.totalLogins ?? 0)}`}
         />
       </section>
     </div>
