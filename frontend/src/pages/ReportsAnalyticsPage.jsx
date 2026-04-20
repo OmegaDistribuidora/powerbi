@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import { useAuth } from "../components/AuthProvider";
 import { apiJson } from "../services/api";
 
@@ -69,6 +70,41 @@ function buildSeriesTooltipData({ item, itemLabel, seriesLabel, total, users, to
   };
 }
 
+function AnalyticsTooltip({ tooltip }) {
+  if (!tooltip || typeof document === "undefined") {
+    return null;
+  }
+
+  return createPortal(
+    <div
+      className="analytics-tooltip"
+      style={{
+        left: `${tooltip.x}px`,
+        top: `${tooltip.y}px`
+      }}
+    >
+      <div className="analytics-tooltip-header">
+        <strong>{tooltip.title}</strong>
+        <span className={`analytics-tooltip-accent analytics-tooltip-accent-${tooltip.tone}`}>{tooltip.accent}</span>
+      </div>
+      <div className="analytics-tooltip-summary">{tooltip.summary}</div>
+      {tooltip.lines.length ? (
+        <div className="analytics-tooltip-list">
+          {tooltip.lines.map((line) => (
+            <div key={`${line.label}-${line.value}`} className="analytics-tooltip-row">
+              <span>{line.label}</span>
+              <span>{line.value}</span>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="analytics-tooltip-empty">Sem detalhamento por usuario.</div>
+      )}
+    </div>,
+    document.body
+  );
+}
+
 function MetricCard({ label, value, hint }) {
   return (
     <article className="page-card analytics-metric-card">
@@ -112,8 +148,7 @@ function BarList({ title, items, valueFormatter, labelFormatter, meta }) {
   );
 }
 
-function DualVerticalBarChart({ title, items, labelFormatter }) {
-  const shellRef = useRef(null);
+function DualVerticalBarChart({ title, items, labelFormatter, minWidth = 760 }) {
   const [tooltip, setTooltip] = useState(null);
   const chartHeight = 240;
   const barWidth = 18;
@@ -124,32 +159,24 @@ function DualVerticalBarChart({ title, items, labelFormatter }) {
   const topPadding = 18;
   const bottomPadding = 62;
   const groupWidth = barWidth * 2 + innerGap;
-  const chartWidth = Math.max(760, leftPadding + rightPadding + items.length * (groupWidth + groupGap));
+  const chartWidth = Math.max(minWidth, leftPadding + rightPadding + items.length * (groupWidth + groupGap));
   const maxValue = Math.max(
     1,
     ...items.flatMap((item) => [item.reportAccesses || 0, item.logins || 0])
   );
 
   function handleTooltipMove(event, payload) {
-    const shell = shellRef.current;
-    const shellRect = shell?.getBoundingClientRect();
-    if (!shell || !shellRect) {
-      return;
-    }
-
-    const tooltipWidth = 320;
-    const tooltipHeight = 92 + Math.max((payload.lines?.length || 0) * 24, 24);
-    const rawX = event.clientX - shellRect.left + shell.scrollLeft + 16;
-    const rawY = event.clientY - shellRect.top + shell.scrollTop;
-    const maxX = shell.scrollLeft + shell.clientWidth - tooltipWidth - 12;
-    const minX = shell.scrollLeft + 12;
-    const fitsAbove = rawY > tooltipHeight + 24;
+    const tooltipWidth = 340;
+    const tooltipHeight = 104 + Math.max((payload.lines?.length || 0) * 24, 24);
+    const minX = tooltipWidth / 2 + 16;
+    const maxX = window.innerWidth - tooltipWidth / 2 - 16;
+    const x = Math.min(Math.max(event.clientX, minX), Math.max(minX, maxX));
+    const y = Math.max(event.clientY, tooltipHeight + 24);
 
     setTooltip({
       ...payload,
-      x: Math.min(Math.max(rawX, minX), Math.max(minX, maxX)),
-      y: fitsAbove ? rawY - 16 : rawY + 20,
-      placement: fitsAbove ? "top" : "bottom"
+      x,
+      y
     });
   }
 
@@ -169,10 +196,11 @@ function DualVerticalBarChart({ title, items, labelFormatter }) {
         </div>
       </div>
       {items.length ? (
-        <div className="analytics-chart-shell" ref={shellRef}>
+        <div className="analytics-chart-shell">
           <svg
             className="analytics-chart"
             viewBox={`0 0 ${chartWidth} ${chartHeight + topPadding + bottomPadding}`}
+            style={{ width: `max(100%, ${chartWidth}px)` }}
             role="img"
             aria-label={title}
           >
@@ -287,38 +315,11 @@ function DualVerticalBarChart({ title, items, labelFormatter }) {
               );
             })}
           </svg>
-          {tooltip ? (
-            <div
-              className="analytics-tooltip"
-              style={{
-                left: `${tooltip.x}px`,
-                top: `${tooltip.y}px`
-              }}
-              data-placement={tooltip.placement}
-            >
-              <div className="analytics-tooltip-header">
-                <strong>{tooltip.title}</strong>
-                <span className={`analytics-tooltip-accent analytics-tooltip-accent-${tooltip.tone}`}>{tooltip.accent}</span>
-              </div>
-              <div className="analytics-tooltip-summary">{tooltip.summary}</div>
-              {tooltip.lines.length ? (
-                <div className="analytics-tooltip-list">
-                  {tooltip.lines.map((line) => (
-                    <div key={`${line.label}-${line.value}`} className="analytics-tooltip-row">
-                      <span>{line.label}</span>
-                      <span>{line.value}</span>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="analytics-tooltip-empty">Sem detalhamento por usuario.</div>
-              )}
-            </div>
-          ) : null}
         </div>
       ) : (
         <p className="muted">Nenhum dado disponivel no periodo selecionado.</p>
       )}
+      <AnalyticsTooltip tooltip={tooltip} />
     </article>
   );
 }
@@ -580,8 +581,13 @@ export default function ReportsAnalyticsPage() {
           labelFormatter={(label) => label}
           meta={`Aberturas no periodo: ${formatAccessLabel(data?.summary?.totalViews ?? 0)}`}
         />
-        <DualVerticalBarChart title="Uso por hora" items={hourItems} labelFormatter={(label) => label} />
-        <DualVerticalBarChart title="Uso por dia da semana" items={weekdayItems} labelFormatter={formatWeekdayShort} />
+        <DualVerticalBarChart title="Uso por hora" items={hourItems} labelFormatter={(label) => label} minWidth={760} />
+        <DualVerticalBarChart
+          title="Uso por dia da semana"
+          items={weekdayItems}
+          labelFormatter={formatWeekdayShort}
+          minWidth={520}
+        />
       </section>
 
       <section className="analytics-stack">

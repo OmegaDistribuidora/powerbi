@@ -1479,11 +1479,11 @@ label {
 .analytics-chart-shell {
   position: relative;
   overflow-x: auto;
+  overflow-y: visible;
 }
 
 .analytics-chart {
-  width: 100%;
-  min-width: 760px;
+  display: block;
   height: 320px;
 }
 
@@ -1555,10 +1555,10 @@ label {
 }
 
 .analytics-tooltip {
-  position: absolute;
-  z-index: 4;
+  position: fixed;
+  z-index: 9999;
   min-width: 240px;
-  max-width: 320px;
+  max-width: min(340px, calc(100vw - 24px));
   padding: 12px 14px;
   border-radius: 16px;
   border: 1px solid rgba(133, 167, 255, 0.2);
@@ -1566,14 +1566,7 @@ label {
   box-shadow: 0 18px 40px rgba(0, 0, 0, 0.35);
   pointer-events: none;
   backdrop-filter: blur(10px);
-}
-
-.analytics-tooltip[data-placement="top"] {
-  transform: translateY(-100%);
-}
-
-.analytics-tooltip[data-placement="bottom"] {
-  transform: translateY(0);
+  transform: translate(-50%, calc(-100% - 16px));
 }
 
 .analytics-tooltip-header {
