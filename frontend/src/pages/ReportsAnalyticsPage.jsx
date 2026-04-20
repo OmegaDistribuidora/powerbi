@@ -115,31 +115,41 @@ function BarList({ title, items, valueFormatter, labelFormatter, meta }) {
 function DualVerticalBarChart({ title, items, labelFormatter }) {
   const shellRef = useRef(null);
   const [tooltip, setTooltip] = useState(null);
-  const chartHeight = 190;
-  const barWidth = 16;
-  const innerGap = 6;
-  const groupGap = 14;
-  const leftPadding = 38;
+  const chartHeight = 240;
+  const barWidth = 18;
+  const innerGap = 8;
+  const groupGap = 18;
+  const leftPadding = 46;
   const rightPadding = 18;
   const topPadding = 18;
-  const bottomPadding = 56;
+  const bottomPadding = 62;
   const groupWidth = barWidth * 2 + innerGap;
-  const chartWidth = Math.max(420, leftPadding + rightPadding + items.length * (groupWidth + groupGap));
+  const chartWidth = Math.max(760, leftPadding + rightPadding + items.length * (groupWidth + groupGap));
   const maxValue = Math.max(
     1,
     ...items.flatMap((item) => [item.reportAccesses || 0, item.logins || 0])
   );
 
   function handleTooltipMove(event, payload) {
-    const shellRect = shellRef.current?.getBoundingClientRect();
-    if (!shellRect) {
+    const shell = shellRef.current;
+    const shellRect = shell?.getBoundingClientRect();
+    if (!shell || !shellRect) {
       return;
     }
 
+    const tooltipWidth = 320;
+    const tooltipHeight = 92 + Math.max((payload.lines?.length || 0) * 24, 24);
+    const rawX = event.clientX - shellRect.left + shell.scrollLeft + 16;
+    const rawY = event.clientY - shellRect.top + shell.scrollTop;
+    const maxX = shell.scrollLeft + shell.clientWidth - tooltipWidth - 12;
+    const minX = shell.scrollLeft + 12;
+    const fitsAbove = rawY > tooltipHeight + 24;
+
     setTooltip({
       ...payload,
-      x: event.clientX - shellRect.left + 16,
-      y: event.clientY - shellRect.top - 16
+      x: Math.min(Math.max(rawX, minX), Math.max(minX, maxX)),
+      y: fitsAbove ? rawY - 16 : rawY + 20,
+      placement: fitsAbove ? "top" : "bottom"
     });
   }
 
@@ -284,6 +294,7 @@ function DualVerticalBarChart({ title, items, labelFormatter }) {
                 left: `${tooltip.x}px`,
                 top: `${tooltip.y}px`
               }}
+              data-placement={tooltip.placement}
             >
               <div className="analytics-tooltip-header">
                 <strong>{tooltip.title}</strong>
@@ -327,7 +338,7 @@ function UserStatsTable({ users }) {
                 <span className="muted small">{user.profileLabel || "Sem perfil"}</span>
               </div>
 
-              <div className="analytics-user-metrics-grid">
+              <div className="analytics-user-overview-grid">
                 <div className="analytics-user-metric-box">
                   <span className="muted small">Aberturas de painel</span>
                   <strong>{user.totalViews}</strong>
@@ -336,34 +347,46 @@ function UserStatsTable({ users }) {
                   <span className="muted small">Logins no sistema</span>
                   <strong>{user.totalLogins}</strong>
                 </div>
-                <div className="analytics-user-metric-box analytics-user-metric-box-wide">
+                <div className="analytics-user-metric-box">
+                  <span className="muted small">Paineis distintos</span>
+                  <strong>{user.uniqueReports}</strong>
+                </div>
+                <div className="analytics-user-metric-box analytics-user-metric-box-featured">
                   <span className="muted small">Painel mais acessado</span>
                   <strong>{user.topReportName}</strong>
                   <span className="muted small">{formatAccessLabel(user.topReportAccesses)}</span>
                 </div>
-                <div className="analytics-user-metric-box">
-                  <span className="muted small">Hora pico de painel</span>
-                  <strong>{user.peakHour}</strong>
-                  <span className="muted small">{formatAccessLabel(user.peakHourAccesses)}</span>
+
+                <div className="analytics-user-peak-card">
+                  <span className="muted small">Picos de painel</span>
+                  <div className="analytics-user-peak-grid">
+                    <div>
+                      <span className="muted small">Hora</span>
+                      <strong>{user.peakHour}</strong>
+                      <span className="muted small">{formatAccessLabel(user.peakHourAccesses)}</span>
+                    </div>
+                    <div>
+                      <span className="muted small">Dia</span>
+                      <strong>{formatWeekdayLabel(user.peakWeekday)}</strong>
+                      <span className="muted small">{formatAccessLabel(user.peakWeekdayAccesses)}</span>
+                    </div>
+                  </div>
                 </div>
-                <div className="analytics-user-metric-box">
-                  <span className="muted small">Hora pico de login</span>
-                  <strong>{user.peakLoginHour}</strong>
-                  <span className="muted small">{formatLoginLabel(user.peakLoginHourAccesses)}</span>
-                </div>
-                <div className="analytics-user-metric-box">
-                  <span className="muted small">Dia pico de painel</span>
-                  <strong>{formatWeekdayLabel(user.peakWeekday)}</strong>
-                  <span className="muted small">{formatAccessLabel(user.peakWeekdayAccesses)}</span>
-                </div>
-                <div className="analytics-user-metric-box">
-                  <span className="muted small">Dia pico de login</span>
-                  <strong>{formatWeekdayLabel(user.peakLoginWeekday)}</strong>
-                  <span className="muted small">{formatLoginLabel(user.peakLoginWeekdayAccesses)}</span>
-                </div>
-                <div className="analytics-user-metric-box">
-                  <span className="muted small">Paineis distintos</span>
-                  <strong>{user.uniqueReports}</strong>
+
+                <div className="analytics-user-peak-card analytics-user-peak-card-login">
+                  <span className="muted small">Picos de login</span>
+                  <div className="analytics-user-peak-grid">
+                    <div>
+                      <span className="muted small">Hora</span>
+                      <strong>{user.peakLoginHour}</strong>
+                      <span className="muted small">{formatLoginLabel(user.peakLoginHourAccesses)}</span>
+                    </div>
+                    <div>
+                      <span className="muted small">Dia</span>
+                      <strong>{formatWeekdayLabel(user.peakLoginWeekday)}</strong>
+                      <span className="muted small">{formatLoginLabel(user.peakLoginWeekdayAccesses)}</span>
+                    </div>
+                  </div>
                 </div>
               </div>
             </article>
