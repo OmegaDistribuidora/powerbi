@@ -202,6 +202,18 @@ async function fetchReportMetadata(report, accessToken) {
   };
 }
 
+function scrollReportViewportToTop() {
+  const behavior = window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth";
+  const scrollOptions = { top: 0, left: 0, behavior };
+
+  window.scrollTo(scrollOptions);
+
+  const content = document.querySelector(".content");
+  if (content instanceof HTMLElement) {
+    content.scrollTo(scrollOptions);
+  }
+}
+
 export default function ReportViewPage() {
   const { id } = useParams();
   const { token } = useAuth();
@@ -242,6 +254,10 @@ export default function ReportViewPage() {
 
     return buildSecureIframeUrl(data.report, data.filters || []);
   }, [data, secureIframeMode]);
+
+  useEffect(() => {
+    scrollReportViewportToTop();
+  }, [id]);
 
   useEffect(() => {
     let active = true;

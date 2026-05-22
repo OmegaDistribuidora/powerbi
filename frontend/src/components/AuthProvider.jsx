@@ -1,7 +1,8 @@
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
-import { apiJson, setUnauthorizedHandler } from "../services/api";
+import { apiJson, setTokenRefreshHandler, setUnauthorizedHandler } from "../services/api";
 
 const STORAGE_KEY = "powerbi-auth";
+const SESSION_PING_INTERVAL_MS = 5 * 60 * 1000;
 const AuthContext = createContext(null);
 
 function parseTokenExpiration(token) {
@@ -98,8 +99,14 @@ export function AuthProvider({ children }) {
       setLoading(false);
       setSsoError("");
     });
+    setTokenRefreshHandler((nextToken) => {
+      setToken((currentToken) => (currentToken === nextToken ? currentToken : nextToken));
+    });
 
-    return () => setUnauthorizedHandler(null);
+    return () => {
+      setUnauthorizedHandler(null);
+      setTokenRefreshHandler(null);
+    };
   }, []);
 
   useEffect(() => {
@@ -158,10 +165,12 @@ export function AuthProvider({ children }) {
           setUser(payload.user);
         }
       })
-      .catch(() => {
+      .catch((error) => {
         if (alive) {
-          setToken(null);
-          setUser(null);
+          if (error?.status === 401) {
+            setToken(null);
+            setUser(null);
+          }
         }
       })
       .finally(() => {
@@ -172,6 +181,50 @@ export function AuthProvider({ children }) {
 
     return () => {
       alive = false;
+    };
+  }, [token]);
+
+  useEffect(() => {
+    if (!token) {
+      return undefined;
+    }
+
+    let cancelled = false;
+
+    async function refreshSessionSilently() {
+      if (document.visibilityState === "hidden") {
+        return;
+      }
+
+      try {
+        const payload = await apiJson("/auth/me", { token });
+        if (!cancelled) {
+          setUser(payload.user);
+        }
+      } catch (error) {
+        if (!cancelled && error?.status === 401) {
+          setToken(null);
+          setUser(null);
+        }
+      }
+    }
+
+    const intervalId = window.setInterval(() => {
+      refreshSessionSilently();
+    }, SESSION_PING_INTERVAL_MS);
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        refreshSessionSilently();
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(intervalId);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
   }, [token]);
 

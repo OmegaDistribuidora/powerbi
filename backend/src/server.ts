@@ -20,6 +20,7 @@ import type { AuthUser } from "./types";
 declare module "fastify" {
   interface FastifyRequest {
     authUser?: AuthUser;
+    renewedAuthToken?: string;
   }
 }
 
@@ -28,7 +29,16 @@ const app = Fastify({ logger: false });
 async function bootstrap(): Promise<void> {
   await app.register(cors, {
     origin: true,
-    credentials: true
+    credentials: true,
+    exposedHeaders: ["x-renewed-token"]
+  });
+
+  app.addHook("onSend", async (request, reply, payload) => {
+    if (request.renewedAuthToken) {
+      reply.header("x-renewed-token", request.renewedAuthToken);
+    }
+
+    return payload;
   });
 
   await app.register(fastifyMultipart, {

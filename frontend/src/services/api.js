@@ -1,5 +1,6 @@
 const API_BASE = "/api";
 let unauthorizedHandler = null;
+let tokenRefreshHandler = null;
 
 class ApiError extends Error {
   constructor(message, status) {
@@ -18,6 +19,11 @@ async function request(path, { token, headers = {}, body, method = "GET" } = {})
     },
     body
   });
+
+  const renewedToken = response.headers.get("x-renewed-token");
+  if (renewedToken && tokenRefreshHandler) {
+    tokenRefreshHandler(renewedToken);
+  }
 
   const contentType = response.headers.get("content-type") || "";
   const payload = contentType.includes("application/json") ? await response.json() : null;
@@ -48,4 +54,8 @@ export function apiJson(path, { token, method = "GET", data } = {}) {
 
 export function setUnauthorizedHandler(handler) {
   unauthorizedHandler = handler;
+}
+
+export function setTokenRefreshHandler(handler) {
+  tokenRefreshHandler = handler;
 }

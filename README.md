@@ -50,8 +50,19 @@ O usuario administrador inicial e criado automaticamente pelo backend usando as 
 - `ADMIN_USERNAME`
 - `ADMIN_PASSWORD`
 - `ADMIN_DISPLAY_NAME`
+- `JWT_SECRET`
 
 Defina esses valores apenas no ambiente de execucao. Evite credenciais previsiveis e nunca exponha valores reais em repositorios, logs ou capturas de tela.
+
+Em `production`, o backend interrompe a inicializacao se `JWT_SECRET` ou `ADMIN_PASSWORD` estiverem ausentes ou usando placeholders inseguros.
+
+## Sessao e logout automatico
+
+- `JWT_EXPIRES_IN`: controla a validade do token JWT emitido no login. O valor padrao e `1h`.
+- O frontend le o `exp` do token e faz logout automatico quando esse prazo expira.
+- Quando restam ate 15 minutos para expirar, o backend emite um novo token nas chamadas autenticadas.
+- Com a aba visivel, o frontend faz uma validacao silenciosa da sessao a cada 5 minutos para renovar esse token sem exigir novo login.
+- Se o token expirar ou qualquer chamada da API retornar `401`, a sessao local e limpa e o usuario volta para o login.
 
 ## Protecao extra para admin via SSO
 

@@ -1,5 +1,5 @@
 import prisma from "./prisma";
-import { env } from "../config";
+import { env, resolveAdminBootstrapPassword } from "../config";
 import { hashPassword } from "./security";
 
 export async function ensureAdminUser(): Promise<void> {
@@ -7,9 +7,9 @@ export async function ensureAdminUser(): Promise<void> {
     where: { username: env.adminUsername }
   });
 
-  const passwordHash = await hashPassword(env.adminPassword);
-
   if (!existing) {
+    const passwordHash = await hashPassword(resolveAdminBootstrapPassword());
+
     await prisma.user.create({
       data: {
         username: env.adminUsername,
