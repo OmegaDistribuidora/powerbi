@@ -239,6 +239,40 @@ function exitDocumentFullscreen() {
   return Promise.resolve(exitFullscreen.call(document));
 }
 
+function ExpandViewIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" className="action-icon">
+      <path d="M5 9V5h4M15 5h4v4M19 15v4h-4M9 19H5v-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M9 5 5 9M15 5l4 4M19 15l-4 4M5 15l4 4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function CollapseViewIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" className="action-icon">
+      <path d="M9 5v4H5M19 9h-4V5M15 19v-4h4M5 15h4v4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M5 9l4-4M19 9l-4-4M19 15l-4 4M5 15l4 4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function FullscreenIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" className="action-icon">
+      <path d="M4 10V4h6M14 4h6v6M20 14v6h-6M10 20H4v-6" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function ExitFullscreenIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" className="action-icon">
+      <path d="M10 4v6H4M20 10h-6V4M14 20v-6h6M4 14h6v6" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
 export default function ReportViewPage() {
   const { id } = useParams();
   const { token } = useAuth();
@@ -252,6 +286,7 @@ export default function ReportViewPage() {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [fullscreenError, setFullscreenError] = useState("");
   const presentationRef = useRef(null);
+  const fullscreenReturnToNormalRef = useRef(false);
   const containerRef = useRef(null);
   const powerbiServiceRef = useRef(null);
   const embeddedReportRef = useRef(null);
@@ -290,7 +325,15 @@ export default function ReportViewPage() {
 
   useEffect(() => {
     function handleFullscreenChange() {
-      setIsFullscreen(Boolean(getFullscreenElement()));
+      const fullscreenElement = getFullscreenElement();
+      setIsFullscreen(Boolean(fullscreenElement));
+
+      if (!fullscreenElement && fullscreenReturnToNormalRef.current) {
+        fullscreenReturnToNormalRef.current = false;
+        setIsExpanded(false);
+        setFullscreenError("");
+        scrollReportViewportToTop();
+      }
     }
 
     document.addEventListener("fullscreenchange", handleFullscreenChange);
@@ -661,8 +704,11 @@ export default function ReportViewPage() {
 
   function handleToggleExpanded() {
     setFullscreenError("");
+    scrollReportViewportToTop();
+
     if (isExpanded) {
       if (isFullscreen) {
+        fullscreenReturnToNormalRef.current = true;
         exitDocumentFullscreen().catch(() => undefined);
       }
       setIsExpanded(false);
@@ -674,8 +720,10 @@ export default function ReportViewPage() {
 
   async function handleToggleFullscreen() {
     setFullscreenError("");
+    scrollReportViewportToTop();
 
     if (isFullscreen) {
+      fullscreenReturnToNormalRef.current = true;
       await exitDocumentFullscreen().catch(() => undefined);
       return;
     }
@@ -686,6 +734,7 @@ export default function ReportViewPage() {
     }
 
     setIsExpanded(true);
+    fullscreenReturnToNormalRef.current = true;
 
     try {
       await requestElementFullscreen(target);
@@ -695,6 +744,7 @@ export default function ReportViewPage() {
       setFullscreenError(
         `Seu navegador bloqueou a tela cheia. Mantive a visualizacao expandida.${detail}`
       );
+      fullscreenReturnToNormalRef.current = false;
     }
   }
 
@@ -709,14 +759,6 @@ export default function ReportViewPage() {
   return (
     <div className={`report-workspace ${isExpanded ? "is-expanded" : ""}`}>
       <section ref={presentationRef} className="page-card report-main-card">
-        <div className="report-view-actions" aria-label="Opcoes de visualizacao do painel">
-          <button type="button" className="secondary-btn compact-btn" onClick={handleToggleExpanded}>
-            {isExpanded ? "Tela normal" : "Expandir"}
-          </button>
-          <button type="button" className="secondary-btn compact-btn" onClick={handleToggleFullscreen}>
-            {isFullscreen ? "Sair tela cheia" : "Tela cheia"}
-          </button>
-        </div>
         {embedError ? <p className="error-text">{embedError}</p> : null}
         {fullscreenError ? <p className="error-text report-view-message">{fullscreenError}</p> : null}
         {secureIframeMode ? (
@@ -742,6 +784,26 @@ export default function ReportViewPage() {
         ) : (
           <div ref={containerRef} className="report-embed-frame report-embed-large" />
         )}
+        <div className="report-view-actions" aria-label="Opcoes de visualizacao do painel">
+          <button
+            type="button"
+            className="icon-btn report-view-btn"
+            onClick={handleToggleExpanded}
+            aria-label={isExpanded ? "Voltar para tela normal" : "Expandir painel"}
+            title={isExpanded ? "Tela normal" : "Expandir"}
+          >
+            {isExpanded ? <CollapseViewIcon /> : <ExpandViewIcon />}
+          </button>
+          <button
+            type="button"
+            className="icon-btn report-view-btn"
+            onClick={handleToggleFullscreen}
+            aria-label={isFullscreen ? "Sair da tela cheia" : "Abrir em tela cheia"}
+            title={isFullscreen ? "Sair tela cheia" : "Tela cheia"}
+          >
+            {isFullscreen ? <ExitFullscreenIcon /> : <FullscreenIcon />}
+          </button>
+        </div>
       </section>
     </div>
   );
