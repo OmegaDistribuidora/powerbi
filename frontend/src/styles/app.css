@@ -973,11 +973,93 @@ label {
 }
 
 .report-main-card {
+  position: relative;
   display: grid;
   gap: 0;
   padding: 8px;
   min-height: calc(100vh - 44px);
   overflow: hidden;
+}
+
+.report-view-actions {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  z-index: 6;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 6px;
+  border: 1px solid rgba(133, 167, 255, 0.24);
+  border-radius: 14px;
+  background: rgba(4, 10, 22, 0.82);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.32);
+  backdrop-filter: blur(10px);
+}
+
+.report-view-actions .compact-btn {
+  white-space: nowrap;
+}
+
+.report-view-message {
+  position: absolute;
+  top: 68px;
+  right: 16px;
+  z-index: 6;
+  max-width: min(420px, calc(100vw - 32px));
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid rgba(255, 180, 180, 0.22);
+  border-radius: 12px;
+  background: rgba(4, 10, 22, 0.88);
+}
+
+.report-workspace.is-expanded {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  display: block;
+  padding: 0;
+  background: #050b16;
+}
+
+.report-workspace.is-expanded .report-main-card {
+  width: 100vw;
+  height: 100vh;
+  min-height: 100vh;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: #050b16;
+  box-shadow: none;
+}
+
+.report-workspace.is-expanded .report-embed-frame,
+.report-main-card:fullscreen .report-embed-frame,
+.report-main-card:-webkit-full-screen .report-embed-frame {
+  height: 100vh;
+  min-height: 100vh;
+  border: 0;
+  border-radius: 0;
+}
+
+.report-workspace.is-expanded .embed-placeholder,
+.report-main-card:fullscreen .embed-placeholder,
+.report-main-card:-webkit-full-screen .embed-placeholder {
+  min-height: 100vh;
+  place-items: center;
+  padding: 24px;
+}
+
+.report-main-card:fullscreen,
+.report-main-card:-webkit-full-screen {
+  width: 100vw;
+  height: 100vh;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: #050b16;
 }
 
 .report-meta-card {

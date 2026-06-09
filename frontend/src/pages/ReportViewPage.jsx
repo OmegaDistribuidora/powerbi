@@ -214,6 +214,31 @@ function scrollReportViewportToTop() {
   }
 }
 
+function getFullscreenElement() {
+  return document.fullscreenElement || document.webkitFullscreenElement || document.msFullscreenElement || null;
+}
+
+function requestElementFullscreen(element) {
+  const requestFullscreen =
+    element.requestFullscreen || element.webkitRequestFullscreen || element.msRequestFullscreen;
+
+  if (!requestFullscreen) {
+    return Promise.reject(new Error("Tela cheia nao suportada neste navegador."));
+  }
+
+  return Promise.resolve(requestFullscreen.call(element));
+}
+
+function exitDocumentFullscreen() {
+  const exitFullscreen = document.exitFullscreen || document.webkitExitFullscreen || document.msExitFullscreen;
+
+  if (!exitFullscreen) {
+    return Promise.resolve();
+  }
+
+  return Promise.resolve(exitFullscreen.call(document));
+}
+
 export default function ReportViewPage() {
   const { id } = useParams();
   const { token } = useAuth();
@@ -223,6 +248,10 @@ export default function ReportViewPage() {
   const [embedStatus, setEmbedStatus] = useState("idle");
   const [microsoftAccount, setMicrosoftAccount] = useState(null);
   const [resolvedEmbed, setResolvedEmbed] = useState(null);
+  const [isExpanded, setIsExpanded] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [fullscreenError, setFullscreenError] = useState("");
+  const presentationRef = useRef(null);
   const containerRef = useRef(null);
   const powerbiServiceRef = useRef(null);
   const embeddedReportRef = useRef(null);
@@ -258,6 +287,30 @@ export default function ReportViewPage() {
   useEffect(() => {
     scrollReportViewportToTop();
   }, [id]);
+
+  useEffect(() => {
+    function handleFullscreenChange() {
+      setIsFullscreen(Boolean(getFullscreenElement()));
+    }
+
+    document.addEventListener("fullscreenchange", handleFullscreenChange);
+    document.addEventListener("webkitfullscreenchange", handleFullscreenChange);
+    document.addEventListener("MSFullscreenChange", handleFullscreenChange);
+
+    return () => {
+      document.removeEventListener("fullscreenchange", handleFullscreenChange);
+      document.removeEventListener("webkitfullscreenchange", handleFullscreenChange);
+      document.removeEventListener("MSFullscreenChange", handleFullscreenChange);
+    };
+  }, []);
+
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => {
+      window.dispatchEvent(new Event("resize"));
+    }, 120);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [isExpanded, isFullscreen]);
 
   useEffect(() => {
     let active = true;
@@ -606,6 +659,45 @@ export default function ReportViewPage() {
     }
   }
 
+  function handleToggleExpanded() {
+    setFullscreenError("");
+    if (isExpanded) {
+      if (isFullscreen) {
+        exitDocumentFullscreen().catch(() => undefined);
+      }
+      setIsExpanded(false);
+      return;
+    }
+
+    setIsExpanded(true);
+  }
+
+  async function handleToggleFullscreen() {
+    setFullscreenError("");
+
+    if (isFullscreen) {
+      await exitDocumentFullscreen().catch(() => undefined);
+      return;
+    }
+
+    const target = presentationRef.current;
+    if (!target) {
+      return;
+    }
+
+    setIsExpanded(true);
+
+    try {
+      await requestElementFullscreen(target);
+      setIsFullscreen(true);
+    } catch (fullscreenRequestError) {
+      const detail = fullscreenRequestError?.message ? ` ${fullscreenRequestError.message}` : "";
+      setFullscreenError(
+        `Seu navegador bloqueou a tela cheia. Mantive a visualizacao expandida.${detail}`
+      );
+    }
+  }
+
   if (error) {
     return <div className="page-card error-text">{error}</div>;
   }
@@ -615,9 +707,18 @@ export default function ReportViewPage() {
   }
 
   return (
-    <div className="report-workspace">
-      <section className="page-card report-main-card">
+    <div className={`report-workspace ${isExpanded ? "is-expanded" : ""}`}>
+      <section ref={presentationRef} className="page-card report-main-card">
+        <div className="report-view-actions" aria-label="Opcoes de visualizacao do painel">
+          <button type="button" className="secondary-btn compact-btn" onClick={handleToggleExpanded}>
+            {isExpanded ? "Tela normal" : "Expandir"}
+          </button>
+          <button type="button" className="secondary-btn compact-btn" onClick={handleToggleFullscreen}>
+            {isFullscreen ? "Sair tela cheia" : "Tela cheia"}
+          </button>
+        </div>
         {embedError ? <p className="error-text">{embedError}</p> : null}
+        {fullscreenError ? <p className="error-text report-view-message">{fullscreenError}</p> : null}
         {secureIframeMode ? (
           <div className="report-embed-frame report-embed-large secure-iframe-shell">
             <iframe
