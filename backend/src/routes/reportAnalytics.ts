@@ -435,6 +435,10 @@ export async function registerReportAnalyticsRoutes(app: FastifyInstance): Promi
       }
     });
 
+    activeUsers.forEach((activeUser) => {
+      ensureUserAccumulator(userStatsMap, activeUser);
+    });
+
     const reportRanking = Array.from(reportRankingMap.values())
       .sort((a, b) => b.accesses - a.accesses || a.reportName.localeCompare(b.reportName))
       .map((report) => {
@@ -526,12 +530,13 @@ export async function registerReportAnalyticsRoutes(app: FastifyInstance): Promi
     const averageMinutesOverall = average(allEstimatedDurations);
     const accessedReports = reportRanking.length;
     const accessedReportsRate = activeReportCount ? Math.round((accessedReports / activeReportCount) * 100) : 0;
+    const activeUsersWithActivity = userStats.filter((user) => user.totalActivity > 0).length;
 
     return {
       startDate: parsed.startDate,
       endDate: parsed.endDate,
       summary: {
-        activeUsers: userStats.length,
+        activeUsers: activeUsersWithActivity,
         totalViews: viewLogs.length,
         totalLogins: loginLogs.length,
         accessedReports,

@@ -457,7 +457,10 @@ function UserReportBreakdown({ user }) {
 }
 
 function ActiveUsersRanking({ users, selectedUserId, onSelect }) {
+  const [showAll, setShowAll] = useState(false);
   const maxActivity = Math.max(1, ...users.map(getUserActivityTotal));
+  const visibleUsers = showAll ? users : users.slice(0, 12);
+  const hasHiddenUsers = users.length > 12;
 
   return (
     <article className="page-card analytics-card analytics-card-compact">
@@ -469,7 +472,7 @@ function ActiveUsersRanking({ users, selectedUserId, onSelect }) {
       </div>
       <div className="analytics-active-user-list">
         {users.length ? (
-          users.slice(0, 12).map((user, index) => {
+          visibleUsers.map((user, index) => {
             const totalActivity = getUserActivityTotal(user);
             const selected = selectedUserId === user.userId;
 
@@ -502,6 +505,15 @@ function ActiveUsersRanking({ users, selectedUserId, onSelect }) {
           <p className="muted">Nenhum usuario gerou atividade no periodo selecionado.</p>
         )}
       </div>
+      {hasHiddenUsers ? (
+        <button
+          type="button"
+          className="secondary-btn compact-btn analytics-show-all-btn"
+          onClick={() => setShowAll((current) => !current)}
+        >
+          {showAll ? "Mostrar menos" : `Mostrar todos (${users.length})`}
+        </button>
+      ) : null}
     </article>
   );
 }

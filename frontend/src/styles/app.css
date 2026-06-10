@@ -1806,6 +1806,10 @@ label {
   line-height: 1;
 }
 
+.analytics-show-all-btn {
+  justify-self: stretch;
+}
+
 .analytics-user-detail-card {
   overflow: hidden;
 }
