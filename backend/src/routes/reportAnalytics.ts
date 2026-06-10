@@ -58,11 +58,16 @@ type ActiveUserRef = {
 
 type UserStatAccumulator = {
   userId: number;
+  username: string;
   displayName: string;
   profileLabel: string | null;
   totalViews: number;
   totalLogins: number;
-  reportCounts: Map<string, { reportId: string; reportName: string; accesses: number }>;
+  firstActivityAt: Date | null;
+  lastActivityAt: Date | null;
+  firstViewAt: Date | null;
+  lastViewAt: Date | null;
+  reportCounts: Map<string, { reportId: string; reportName: string; categoryName: string; accesses: number }>;
   viewHourCounts: number[];
   viewWeekdayCounts: Map<string, number>;
   loginHourCounts: number[];
@@ -129,9 +134,10 @@ function estimateSessionDurations(logs: AuditLogRef[]) {
     byUser.get(actorKey)?.push(log);
   });
 
-  const durations = new Map<string, number[]>();
+  const reportDurations = new Map<string, number[]>();
+  const userDurations = new Map<string, number[]>();
 
-  byUser.forEach((userLogs) => {
+  byUser.forEach((userLogs, actorKey) => {
     userLogs.sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
 
     userLogs.forEach((log, index) => {
@@ -142,14 +148,19 @@ function estimateSessionDurations(logs: AuditLogRef[]) {
       const estimatedMinutes = Math.max(1, Math.min(MAX_SESSION_MINUTES, Math.round(rawMinutes)));
       const reportKey = `${log.entityId || "unknown"}`;
 
-      if (!durations.has(reportKey)) {
-        durations.set(reportKey, []);
+      if (!reportDurations.has(reportKey)) {
+        reportDurations.set(reportKey, []);
       }
-      durations.get(reportKey)?.push(estimatedMinutes);
+      reportDurations.get(reportKey)?.push(estimatedMinutes);
+
+      if (!userDurations.has(actorKey)) {
+        userDurations.set(actorKey, []);
+      }
+      userDurations.get(actorKey)?.push(estimatedMinutes);
     });
   });
 
-  return durations;
+  return { reportDurations, userDurations };
 }
 
 function average(values: number[]) {
@@ -168,10 +179,15 @@ function ensureUserAccumulator(userStatsMap: Map<number, UserStatAccumulator>, a
   if (!userStatsMap.has(activeUser.id)) {
     userStatsMap.set(activeUser.id, {
       userId: activeUser.id,
+      username: activeUser.username,
       displayName: activeUser.displayName,
       profileLabel: activeUser.profileLabel,
       totalViews: 0,
       totalLogins: 0,
+      firstActivityAt: null,
+      lastActivityAt: null,
+      firstViewAt: null,
+      lastViewAt: null,
       reportCounts: new Map(),
       viewHourCounts: Array.from({ length: 24 }, () => 0),
       viewWeekdayCounts: new Map(WEEKDAY_SEED.map((label) => [normalizeWeekday(label), 0])),
@@ -181,6 +197,24 @@ function ensureUserAccumulator(userStatsMap: Map<number, UserStatAccumulator>, a
   }
 
   return userStatsMap.get(activeUser.id)!;
+}
+
+function trackActivityWindow(userStats: UserStatAccumulator, createdAt: Date, kind: "view" | "login") {
+  if (!userStats.firstActivityAt || createdAt < userStats.firstActivityAt) {
+    userStats.firstActivityAt = createdAt;
+  }
+  if (!userStats.lastActivityAt || createdAt > userStats.lastActivityAt) {
+    userStats.lastActivityAt = createdAt;
+  }
+
+  if (kind === "view") {
+    if (!userStats.firstViewAt || createdAt < userStats.firstViewAt) {
+      userStats.firstViewAt = createdAt;
+    }
+    if (!userStats.lastViewAt || createdAt > userStats.lastViewAt) {
+      userStats.lastViewAt = createdAt;
+    }
+  }
 }
 
 function trackBreakdown(targetMap: Map<number, AccessBreakdown>, activeUser: ActiveUserRef) {
@@ -325,7 +359,7 @@ export async function registerReportAnalyticsRoutes(app: FastifyInstance): Promi
     const loginHourUsers = Array.from({ length: 24 }, () => new Map<number, AccessBreakdown>());
     const viewWeekdayUsers = new Map(WEEKDAY_SEED.map((weekday) => [normalizeWeekday(weekday), new Map<number, AccessBreakdown>()]));
     const loginWeekdayUsers = new Map(WEEKDAY_SEED.map((weekday) => [normalizeWeekday(weekday), new Map<number, AccessBreakdown>()]));
-    const durationsByReport = estimateSessionDurations(viewLogs as AuditLogRef[]);
+    const { reportDurations, userDurations } = estimateSessionDurations(viewLogs as AuditLogRef[]);
     const userStatsMap = new Map<number, UserStatAccumulator>();
 
     viewLogs.forEach((log) => {
@@ -356,6 +390,7 @@ export async function registerReportAnalyticsRoutes(app: FastifyInstance): Promi
 
       const userStats = ensureUserAccumulator(userStatsMap, activeUser);
       userStats.totalViews += 1;
+      trackActivityWindow(userStats, log.createdAt, "view");
       userStats.viewHourCounts[hour] += 1;
       userStats.viewWeekdayCounts.set(weekday, (userStats.viewWeekdayCounts.get(weekday) || 0) + 1);
 
@@ -368,6 +403,7 @@ export async function registerReportAnalyticsRoutes(app: FastifyInstance): Promi
       const reportEntry = userStats.reportCounts.get(reportId) || {
         reportId,
         reportName,
+        categoryName,
         accesses: 0
       };
       reportEntry.accesses += 1;
@@ -388,6 +424,7 @@ export async function registerReportAnalyticsRoutes(app: FastifyInstance): Promi
 
       const userStats = ensureUserAccumulator(userStatsMap, activeUser);
       userStats.totalLogins += 1;
+      trackActivityWindow(userStats, log.createdAt, "login");
       userStats.loginHourCounts[hour] += 1;
       userStats.loginWeekdayCounts.set(weekday, (userStats.loginWeekdayCounts.get(weekday) || 0) + 1);
 
@@ -401,7 +438,7 @@ export async function registerReportAnalyticsRoutes(app: FastifyInstance): Promi
     const reportRanking = Array.from(reportRankingMap.values())
       .sort((a, b) => b.accesses - a.accesses || a.reportName.localeCompare(b.reportName))
       .map((report) => {
-        const durations = durationsByReport.get(report.reportId) || [];
+        const durations = reportDurations.get(report.reportId) || [];
         const averageMinutes = average(durations);
 
         return {
@@ -423,14 +460,20 @@ export async function registerReportAnalyticsRoutes(app: FastifyInstance): Promi
 
     const userStats = Array.from(userStatsMap.values())
       .map((user) => {
-        const topReport = Array.from(user.reportCounts.values()).sort(
+        const reportBreakdown = Array.from(user.reportCounts.values()).sort(
           (a, b) => b.accesses - a.accesses || a.reportName.localeCompare(b.reportName)
-        )[0] || null;
+        );
+        const topReport = reportBreakdown[0] || null;
 
         const peakViewHour = findPeak(user.viewHourCounts);
         const peakViewWeekday = findPeakWeekday(user.viewWeekdayCounts);
         const peakLoginHour = findPeak(user.loginHourCounts);
         const peakLoginWeekday = findPeakWeekday(user.loginWeekdayCounts);
+        const averageMinutes = average([
+          ...(userDurations.get(`id:${user.userId}`) || []),
+          ...(userDurations.get(`username:${user.username}`) || [])
+        ]);
+        const totalActivity = user.totalViews + user.totalLogins;
 
         return {
           userId: user.userId,
@@ -438,8 +481,14 @@ export async function registerReportAnalyticsRoutes(app: FastifyInstance): Promi
           profileLabel: user.profileLabel,
           totalViews: user.totalViews,
           totalLogins: user.totalLogins,
+          totalActivity,
+          averageMinutes,
           topReportName: topReport?.reportName || "Sem dados",
           topReportAccesses: topReport?.accesses || 0,
+          firstActivityAt: user.firstActivityAt?.toISOString() || null,
+          lastActivityAt: user.lastActivityAt?.toISOString() || null,
+          firstViewAt: user.firstViewAt?.toISOString() || null,
+          lastViewAt: user.lastViewAt?.toISOString() || null,
           peakHour: `${String(peakViewHour.index).padStart(2, "0")}h`,
           peakHourAccesses: peakViewHour.accesses,
           peakWeekday: peakViewWeekday.weekday,
@@ -448,10 +497,18 @@ export async function registerReportAnalyticsRoutes(app: FastifyInstance): Promi
           peakLoginHourAccesses: peakLoginHour.accesses,
           peakLoginWeekday: peakLoginWeekday.weekday,
           peakLoginWeekdayAccesses: peakLoginWeekday.accesses,
-          uniqueReports: user.reportCounts.size
+          uniqueReports: user.reportCounts.size,
+          reportBreakdown,
+          viewHours: user.viewHourCounts.map((accesses, hour) => ({ hour, accesses })),
+          loginHours: user.loginHourCounts.map((logins, hour) => ({ hour, logins })),
+          viewWeekdays: Array.from(user.viewWeekdayCounts.entries()).map(([weekday, accesses]) => ({ weekday, accesses })),
+          loginWeekdays: Array.from(user.loginWeekdayCounts.entries()).map(([weekday, logins]) => ({ weekday, logins }))
         };
       })
       .sort((a, b) => {
+        if (b.totalActivity !== a.totalActivity) {
+          return b.totalActivity - a.totalActivity;
+        }
         if (b.totalViews !== a.totalViews) {
           return b.totalViews - a.totalViews;
         }
@@ -465,7 +522,7 @@ export async function registerReportAnalyticsRoutes(app: FastifyInstance): Promi
       (a, b) => b.accesses - a.accesses || a.categoryName.localeCompare(b.categoryName)
     );
 
-    const allEstimatedDurations = Array.from(durationsByReport.values()).flat();
+    const allEstimatedDurations = Array.from(reportDurations.values()).flat();
     const averageMinutesOverall = average(allEstimatedDurations);
     const accessedReports = reportRanking.length;
     const accessedReportsRate = activeReportCount ? Math.round((accessedReports / activeReportCount) * 100) : 0;

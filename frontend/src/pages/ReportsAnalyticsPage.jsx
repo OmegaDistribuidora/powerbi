@@ -57,6 +57,36 @@ function formatLoginLabel(value) {
   return formatCount(value, "login", "logins");
 }
 
+function formatDateTime(value) {
+  if (!value) {
+    return "Sem dados";
+  }
+
+  return new Intl.DateTimeFormat("pt-BR", {
+    dateStyle: "short",
+    timeStyle: "short"
+  }).format(new Date(value));
+}
+
+function formatPercent(value) {
+  return `${Math.round(value || 0)}%`;
+}
+
+function getUserActivityTotal(user) {
+  return user?.totalActivity ?? (user?.totalViews || 0) + (user?.totalLogins || 0);
+}
+
+function combineUserHours(user) {
+  const views = new Map((user?.viewHours || []).map((item) => [item.hour, item.accesses || 0]));
+  const logins = new Map((user?.loginHours || []).map((item) => [item.hour, item.logins || 0]));
+
+  return Array.from({ length: 24 }, (_, hour) => ({
+    hour,
+    views: views.get(hour) || 0,
+    logins: logins.get(hour) || 0
+  }));
+}
+
 function buildSeriesTooltipData({ item, itemLabel, seriesLabel, total, users, totalFormatter }) {
   return {
     title: itemLabel,
@@ -329,78 +359,229 @@ function DualVerticalBarChart({ title, items, labelFormatter, minWidth = 760 }) 
   );
 }
 
-function UserStatsTable({ users }) {
+function ActivityDonut({ user }) {
+  const views = user?.totalViews || 0;
+  const logins = user?.totalLogins || 0;
+  const total = Math.max(1, views + logins);
+  const viewShare = (views / total) * 100;
+  const circumference = 100;
+
   return (
-    <article className="page-card analytics-card analytics-full-span">
-      <div className="header-line">
-        <h2>Dados por usuario</h2>
+    <div className="analytics-donut-card">
+      <svg className="analytics-donut" viewBox="0 0 42 42" role="img" aria-label="Mix de atividade">
+        <circle className="analytics-donut-bg" cx="21" cy="21" r="15.915" />
+        <circle
+          className="analytics-donut-segment analytics-donut-segment-view"
+          cx="21"
+          cy="21"
+          r="15.915"
+          strokeDasharray={`${viewShare} ${circumference - viewShare}`}
+          strokeDashoffset="25"
+        />
+        <circle
+          className="analytics-donut-segment analytics-donut-segment-login"
+          cx="21"
+          cy="21"
+          r="15.915"
+          strokeDasharray={`${100 - viewShare} ${viewShare}`}
+          strokeDashoffset={25 - viewShare}
+        />
+      </svg>
+      <div className="analytics-donut-copy">
+        <span className="muted small">Mix de atividade</span>
+        <strong>{formatPercent(viewShare)} paineis</strong>
+        <span className="muted small">{formatAccessLabel(views)} / {formatLoginLabel(logins)}</span>
       </div>
-      {users.length ? (
-        <div className="analytics-user-list">
-          {users.map((user) => (
-            <article key={user.userId} className="analytics-user-card">
-              <div className="analytics-user-header">
-                <strong>{user.displayName}</strong>
-                <span className="muted small">{user.profileLabel || "Sem perfil"}</span>
+    </div>
+  );
+}
+
+function UserHourBars({ user }) {
+  const items = combineUserHours(user);
+  const maxValue = Math.max(1, ...items.map((item) => item.views + item.logins));
+
+  return (
+    <div className="analytics-user-hour-chart" aria-label="Distribuicao de atividade por hora">
+      {items.map((item) => {
+        const total = item.views + item.logins;
+        return (
+          <div key={item.hour} className="analytics-user-hour-column" title={`${String(item.hour).padStart(2, "0")}h: ${formatCount(total, "evento", "eventos")}`}>
+            <div className="analytics-user-hour-bar">
+              <span
+                className="analytics-user-hour-fill analytics-user-hour-fill-view"
+                style={{ height: `${item.views ? Math.max(8, (item.views / maxValue) * 100) : 0}%` }}
+              />
+              <span
+                className="analytics-user-hour-fill analytics-user-hour-fill-login"
+                style={{ height: `${item.logins ? Math.max(8, (item.logins / maxValue) * 100) : 0}%` }}
+              />
+            </div>
+            <span>{String(item.hour).padStart(2, "0")}</span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function UserReportBreakdown({ user }) {
+  const items = user?.reportBreakdown || [];
+  const maxValue = Math.max(1, ...items.map((item) => item.accesses || 0));
+
+  return (
+    <div className="analytics-user-report-list">
+      {items.length ? (
+        items.slice(0, 8).map((item, index) => (
+          <div key={item.reportId} className="analytics-user-report-row">
+            <span className="analytics-rank-number">{index + 1}</span>
+            <div className="analytics-user-report-main">
+              <div className="analytics-row-head">
+                <strong>{item.reportName}</strong>
+                <span className="muted small">{formatAccessLabel(item.accesses)}</span>
               </div>
-
-              <div className="analytics-user-overview-grid">
-                <div className="analytics-user-metric-box">
-                  <span className="muted small">Aberturas de painel</span>
-                  <strong>{user.totalViews}</strong>
-                </div>
-                <div className="analytics-user-metric-box">
-                  <span className="muted small">Logins no sistema</span>
-                  <strong>{user.totalLogins}</strong>
-                </div>
-                <div className="analytics-user-metric-box">
-                  <span className="muted small">Paineis distintos</span>
-                  <strong>{user.uniqueReports}</strong>
-                </div>
-                <div className="analytics-user-metric-box analytics-user-metric-box-featured">
-                  <span className="muted small">Painel mais acessado</span>
-                  <strong>{user.topReportName}</strong>
-                  <span className="muted small">{formatAccessLabel(user.topReportAccesses)}</span>
-                </div>
-
-                <div className="analytics-user-peak-card">
-                  <span className="muted small">Picos de painel</span>
-                  <div className="analytics-user-peak-grid">
-                    <div>
-                      <span className="muted small">Hora</span>
-                      <strong>{user.peakHour}</strong>
-                      <span className="muted small">{formatAccessLabel(user.peakHourAccesses)}</span>
-                    </div>
-                    <div>
-                      <span className="muted small">Dia</span>
-                      <strong>{formatWeekdayLabel(user.peakWeekday)}</strong>
-                      <span className="muted small">{formatAccessLabel(user.peakWeekdayAccesses)}</span>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="analytics-user-peak-card analytics-user-peak-card-login">
-                  <span className="muted small">Picos de login</span>
-                  <div className="analytics-user-peak-grid">
-                    <div>
-                      <span className="muted small">Hora</span>
-                      <strong>{user.peakLoginHour}</strong>
-                      <span className="muted small">{formatLoginLabel(user.peakLoginHourAccesses)}</span>
-                    </div>
-                    <div>
-                      <span className="muted small">Dia</span>
-                      <strong>{formatWeekdayLabel(user.peakLoginWeekday)}</strong>
-                      <span className="muted small">{formatLoginLabel(user.peakLoginWeekdayAccesses)}</span>
-                    </div>
-                  </div>
-                </div>
+              <div className="analytics-bar-track">
+                <div
+                  className="analytics-bar-fill"
+                  style={{ width: `${Math.max(6, ((item.accesses || 0) / maxValue) * 100)}%` }}
+                />
               </div>
-            </article>
-          ))}
-        </div>
+              <span className="muted small">{item.categoryName || "Sem categoria"}</span>
+            </div>
+          </div>
+        ))
       ) : (
-        <p className="muted">Nenhum usuario ativo gerou logins ou aberturas de painel no periodo selecionado.</p>
+        <p className="muted">Este usuario fez login no periodo, mas nao abriu paineis.</p>
       )}
+    </div>
+  );
+}
+
+function ActiveUsersRanking({ users, selectedUserId, onSelect }) {
+  const maxActivity = Math.max(1, ...users.map(getUserActivityTotal));
+
+  return (
+    <article className="page-card analytics-card analytics-card-compact">
+      <div className="header-line">
+        <div>
+          <h2>Usuarios mais ativos</h2>
+          <span className="muted small">Ranking por logins e aberturas de paineis no periodo.</span>
+        </div>
+      </div>
+      <div className="analytics-active-user-list">
+        {users.length ? (
+          users.slice(0, 12).map((user, index) => {
+            const totalActivity = getUserActivityTotal(user);
+            const selected = selectedUserId === user.userId;
+
+            return (
+              <button
+                key={user.userId}
+                type="button"
+                className={`analytics-active-user-card${selected ? " is-selected" : ""}`}
+                onClick={() => onSelect(user.userId)}
+              >
+                <span className="analytics-rank-number">{index + 1}</span>
+                <span className="analytics-active-user-main">
+                  <strong>{user.displayName}</strong>
+                  <span className="muted small">{user.profileLabel || "Sem perfil"}</span>
+                  <span className="analytics-bar-track">
+                    <span
+                      className="analytics-bar-fill"
+                      style={{ width: `${Math.max(8, (totalActivity / maxActivity) * 100)}%` }}
+                    />
+                  </span>
+                </span>
+                <span className="analytics-active-user-score">
+                  <strong>{totalActivity}</strong>
+                  <span className="muted small">eventos</span>
+                </span>
+              </button>
+            );
+          })
+        ) : (
+          <p className="muted">Nenhum usuario gerou atividade no periodo selecionado.</p>
+        )}
+      </div>
+    </article>
+  );
+}
+
+function UserDetailPanel({ user }) {
+  if (!user) {
+    return (
+      <article className="page-card analytics-card analytics-card-compact analytics-user-detail-empty">
+        <h2>Resumo do usuario</h2>
+        <p className="muted">Selecione um usuario no ranking para ver o detalhamento.</p>
+      </article>
+    );
+  }
+
+  const totalActivity = getUserActivityTotal(user);
+  const reportCoverage = user.uniqueReports ? `${user.uniqueReports} ${user.uniqueReports === 1 ? "painel" : "paineis"}` : "Nenhum painel";
+
+  return (
+    <article className="page-card analytics-card analytics-card-compact analytics-user-detail-card">
+      <div className="header-line">
+        <div>
+          <h2>{user.displayName}</h2>
+          <span className="muted small">{user.profileLabel || "Sem perfil"}</span>
+        </div>
+        <span className="tag-chip tag-chip-muted">{formatCount(totalActivity, "evento", "eventos")}</span>
+      </div>
+
+      <div className="analytics-user-detail-grid">
+        <ActivityDonut user={user} />
+        <div className="analytics-user-metric-box">
+          <span className="muted small">Aberturas de painel</span>
+          <strong>{user.totalViews}</strong>
+          <span className="muted small">{reportCoverage}</span>
+        </div>
+        <div className="analytics-user-metric-box">
+          <span className="muted small">Logins no sistema</span>
+          <strong>{user.totalLogins}</strong>
+          <span className="muted small">Manual e SSO</span>
+        </div>
+        <div className="analytics-user-metric-box">
+          <span className="muted small">Tempo medio estimado</span>
+          <strong>{formatMinutes(user.averageMinutes)}</strong>
+          <span className="muted small">Entre aberturas de paineis</span>
+        </div>
+      </div>
+
+      <div className="analytics-user-split">
+        <div className="analytics-user-panel">
+          <div className="header-line">
+            <h3>Paineis mais abertos</h3>
+            <span className="muted small">{user.topReportName}</span>
+          </div>
+          <UserReportBreakdown user={user} />
+        </div>
+
+        <div className="analytics-user-panel">
+          <h3>Padrao de uso</h3>
+          <div className="analytics-user-peak-grid">
+            <div>
+              <span className="muted small">Pico de painel</span>
+              <strong>{user.peakHour}</strong>
+              <span className="muted small">{formatWeekdayLabel(user.peakWeekday)} - {formatAccessLabel(user.peakWeekdayAccesses)}</span>
+            </div>
+            <div>
+              <span className="muted small">Pico de login</span>
+              <strong>{user.peakLoginHour}</strong>
+              <span className="muted small">{formatWeekdayLabel(user.peakLoginWeekday)} - {formatLoginLabel(user.peakLoginWeekdayAccesses)}</span>
+            </div>
+            <div>
+              <span className="muted small">Primeira atividade</span>
+              <strong>{formatDateTime(user.firstActivityAt)}</strong>
+            </div>
+            <div>
+              <span className="muted small">Ultima atividade</span>
+              <strong>{formatDateTime(user.lastActivityAt)}</strong>
+            </div>
+          </div>
+          <UserHourBars user={user} />
+        </div>
+      </div>
     </article>
   );
 }
@@ -410,6 +591,7 @@ export default function ReportsAnalyticsPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState(null);
+  const [selectedUserId, setSelectedUserId] = useState(null);
   const [filters, setFilters] = useState(() => {
     const end = new Date();
     const start = new Date(end.getTime() - 6 * 24 * 60 * 60 * 1000);
@@ -438,6 +620,18 @@ export default function ReportsAnalyticsPage() {
   useEffect(() => {
     loadAnalytics(filters);
   }, [token]);
+
+  useEffect(() => {
+    const users = data?.userStats || [];
+    if (!users.length) {
+      setSelectedUserId(null);
+      return;
+    }
+
+    if (!users.some((user) => user.userId === selectedUserId)) {
+      setSelectedUserId(users[0].userId);
+    }
+  }, [data, selectedUserId]);
 
   const rankingItems = useMemo(
     () =>
@@ -498,6 +692,9 @@ export default function ReportsAnalyticsPage() {
       })),
     [data]
   );
+
+  const activeUsers = data?.userStats || [];
+  const selectedUser = activeUsers.find((user) => user.userId === selectedUserId) || activeUsers[0] || null;
 
   const accessedReportsSummary = data?.summary
     ? `${data.summary.accessedReports}/${data.summary.activeReports} (${data.summary.accessedReportsRate}%)`
@@ -571,6 +768,11 @@ export default function ReportsAnalyticsPage() {
         />
       </section>
 
+      <section className="analytics-user-insights">
+        <ActiveUsersRanking users={activeUsers} selectedUserId={selectedUser?.userId || null} onSelect={setSelectedUserId} />
+        <UserDetailPanel user={selectedUser} />
+      </section>
+
       <section className="analytics-grid">
         <BarList
           title="Ranking de paineis mais abertos"
@@ -596,7 +798,6 @@ export default function ReportsAnalyticsPage() {
       </section>
 
       <section className="analytics-stack">
-        <UserStatsTable users={data?.userStats || []} />
         <BarList
           title="Categorias mais acessadas por abertura de painel"
           items={categoryItems}
