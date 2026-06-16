@@ -22,7 +22,8 @@ const WEEKDAY_SEED = [
 
 const analyticsQuerySchema = z.object({
   startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-  endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/)
+  endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  userIds: z.string().optional()
 });
 
 type AuditLogRef = {
@@ -68,7 +69,20 @@ type UserStatAccumulator = {
   lastActivityAt: Date | null;
   firstViewAt: Date | null;
   lastViewAt: Date | null;
-  reportCounts: Map<string, { reportId: string; reportName: string; categoryName: string; accesses: number }>;
+  reportCounts: Map<
+    string,
+    {
+      reportId: string;
+      reportName: string;
+      categoryName: string;
+      accesses: number;
+      firstViewAt: Date | null;
+      lastViewAt: Date | null;
+      viewHourCounts: number[];
+      viewWeekdayCounts: Map<string, number>;
+      viewDayCounts: Map<string, number>;
+    }
+  >;
   viewHourCounts: number[];
   viewWeekdayCounts: Map<string, number>;
   viewDayCounts: Map<string, number>;
@@ -139,6 +153,7 @@ function estimateSessionDurations(logs: AuditLogRef[]) {
 
   const reportDurations = new Map<string, number[]>();
   const userDurations = new Map<string, number[]>();
+  const userReportDurations = new Map<string, number[]>();
 
   byUser.forEach((userLogs, actorKey) => {
     userLogs.sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
@@ -160,10 +175,16 @@ function estimateSessionDurations(logs: AuditLogRef[]) {
         userDurations.set(actorKey, []);
       }
       userDurations.get(actorKey)?.push(estimatedMinutes);
+
+      const userReportKey = `${actorKey}::${reportKey}`;
+      if (!userReportDurations.has(userReportKey)) {
+        userReportDurations.set(userReportKey, []);
+      }
+      userReportDurations.get(userReportKey)?.push(estimatedMinutes);
     });
   });
 
-  return { reportDurations, userDurations };
+  return { reportDurations, userDurations, userReportDurations };
 }
 
 function formatFortalezaDateKey(date: Date) {
@@ -190,6 +211,35 @@ function buildDateKeys(startDate: string, endDate: string) {
   }
 
   return keys;
+}
+
+function parseSelectedUserIds(rawValue: string | undefined, availableUsers: ActiveUserRef[]) {
+  if (typeof rawValue === "undefined") {
+    return new Set(availableUsers.map((user) => user.id));
+  }
+
+  const availableIds = new Set(availableUsers.map((user) => user.id));
+  const selectedIds = String(rawValue || "")
+    .split(",")
+    .map((item) => Number(item.trim()))
+    .filter((value) => Number.isInteger(value) && value > 0 && availableIds.has(value));
+
+  return new Set(selectedIds);
+}
+
+function buildUserLogWhere(activeUsers: ActiveUserRef[]) {
+  if (!activeUsers.length) {
+    return {
+      actorUserId: -1
+    };
+  }
+
+  return {
+    OR: [
+      { actorUserId: { in: activeUsers.map((user) => user.id) } },
+      { actorUsername: { in: activeUsers.map((user) => user.username) } }
+    ]
+  };
 }
 
 function average(values: number[]) {
@@ -280,6 +330,17 @@ function findPeakWeekday(counts: Map<string, number>) {
   );
 }
 
+function findAverageForUserReport(
+  userReportDurations: Map<string, number[]>,
+  user: UserStatAccumulator,
+  reportId: string
+) {
+  return average([
+    ...(userReportDurations.get(`id:${user.userId}::${reportId}`) || []),
+    ...(userReportDurations.get(`username:${user.username}::${reportId}`) || [])
+  ]);
+}
+
 export async function registerReportAnalyticsRoutes(app: FastifyInstance): Promise<void> {
   app.get("/api/report-analytics", { preHandler: [requireAuth, requireModuleAccess("REPORTS_ANALYTICS")] }, async (request, reply) => {
     let parsed;
@@ -297,14 +358,38 @@ export async function registerReportAnalyticsRoutes(app: FastifyInstance): Promi
       return reply.code(400).send({ message: error instanceof Error ? error.message : "Intervalo invalido." });
     }
 
-    const [viewLogs, loginLogs, activeReportCount, activeUsers] = await Promise.all([
+    const [activeReportCount, availableUsers] = await Promise.all([
+      prisma.report.count({
+        where: { active: true }
+      }),
+      prisma.user.findMany({
+        where: {
+          active: true,
+          role: "USER"
+        },
+        select: {
+          id: true,
+          username: true,
+          displayName: true,
+          profileLabel: true
+        },
+        orderBy: [{ profileLabel: "asc" }, { displayName: "asc" }]
+      })
+    ]);
+
+    const selectedUserIds = parseSelectedUserIds(parsed.userIds, availableUsers);
+    const activeUsers = availableUsers.filter((user) => selectedUserIds.has(user.id));
+    const userLogWhere = buildUserLogWhere(activeUsers);
+
+    const [viewLogs, loginLogs] = await Promise.all([
       prisma.auditLog.findMany({
         where: {
           action: "VIEW_REPORT",
           createdAt: {
             gte: range.start,
             lte: range.end
-          }
+          },
+          ...userLogWhere
         },
         select: {
           id: true,
@@ -325,7 +410,8 @@ export async function registerReportAnalyticsRoutes(app: FastifyInstance): Promi
           createdAt: {
             gte: range.start,
             lte: range.end
-          }
+          },
+          ...userLogWhere
         },
         select: {
           id: true,
@@ -336,21 +422,6 @@ export async function registerReportAnalyticsRoutes(app: FastifyInstance): Promi
           createdAt: true
         },
         orderBy: { createdAt: "desc" }
-      }),
-      prisma.report.count({
-        where: { active: true }
-      }),
-      prisma.user.findMany({
-        where: {
-          active: true,
-          role: "USER"
-        },
-        select: {
-          id: true,
-          username: true,
-          displayName: true,
-          profileLabel: true
-        }
       })
     ]);
 
@@ -391,7 +462,7 @@ export async function registerReportAnalyticsRoutes(app: FastifyInstance): Promi
     const loginHourUsers = Array.from({ length: 24 }, () => new Map<number, AccessBreakdown>());
     const viewWeekdayUsers = new Map(WEEKDAY_SEED.map((weekday) => [normalizeWeekday(weekday), new Map<number, AccessBreakdown>()]));
     const loginWeekdayUsers = new Map(WEEKDAY_SEED.map((weekday) => [normalizeWeekday(weekday), new Map<number, AccessBreakdown>()]));
-    const { reportDurations, userDurations } = estimateSessionDurations(viewLogs as AuditLogRef[]);
+    const { reportDurations, userDurations, userReportDurations } = estimateSessionDurations(viewLogs as AuditLogRef[]);
     const userStatsMap = new Map<number, UserStatAccumulator>();
 
     viewLogs.forEach((log) => {
@@ -438,9 +509,23 @@ export async function registerReportAnalyticsRoutes(app: FastifyInstance): Promi
         reportId,
         reportName,
         categoryName,
-        accesses: 0
+        accesses: 0,
+        firstViewAt: null,
+        lastViewAt: null,
+        viewHourCounts: Array.from({ length: 24 }, () => 0),
+        viewWeekdayCounts: new Map(WEEKDAY_SEED.map((label) => [normalizeWeekday(label), 0])),
+        viewDayCounts: new Map(dateKeys.map((date) => [date, 0]))
       };
       reportEntry.accesses += 1;
+      reportEntry.viewHourCounts[hour] += 1;
+      reportEntry.viewWeekdayCounts.set(weekday, (reportEntry.viewWeekdayCounts.get(weekday) || 0) + 1);
+      reportEntry.viewDayCounts.set(dateKey, (reportEntry.viewDayCounts.get(dateKey) || 0) + 1);
+      if (!reportEntry.firstViewAt || log.createdAt < reportEntry.firstViewAt) {
+        reportEntry.firstViewAt = log.createdAt;
+      }
+      if (!reportEntry.lastViewAt || log.createdAt > reportEntry.lastViewAt) {
+        reportEntry.lastViewAt = log.createdAt;
+      }
       userStats.reportCounts.set(reportId, reportEntry);
     });
 
@@ -500,9 +585,35 @@ export async function registerReportAnalyticsRoutes(app: FastifyInstance): Promi
 
     const userStats = Array.from(userStatsMap.values())
       .map((user) => {
-        const reportBreakdown = Array.from(user.reportCounts.values()).sort(
-          (a, b) => b.accesses - a.accesses || a.reportName.localeCompare(b.reportName)
-        );
+        const reportBreakdown = Array.from(user.reportCounts.values())
+          .sort((a, b) => b.accesses - a.accesses || a.reportName.localeCompare(b.reportName))
+          .map((report) => {
+            const peakReportHour = findPeak(report.viewHourCounts);
+            const peakReportWeekday = findPeakWeekday(report.viewWeekdayCounts);
+
+            return {
+              reportId: report.reportId,
+              reportName: report.reportName,
+              categoryName: report.categoryName,
+              accesses: report.accesses,
+              averageMinutes: findAverageForUserReport(userReportDurations, user, report.reportId),
+              firstViewAt: report.firstViewAt?.toISOString() || null,
+              lastViewAt: report.lastViewAt?.toISOString() || null,
+              peakHour: `${String(peakReportHour.index).padStart(2, "0")}h`,
+              peakHourAccesses: peakReportHour.accesses,
+              peakWeekday: peakReportWeekday.weekday,
+              peakWeekdayAccesses: peakReportWeekday.accesses,
+              activityByDay: dateKeys.map((date) => ({
+                date,
+                views: report.viewDayCounts.get(date) || 0
+              })),
+              viewHours: report.viewHourCounts.map((accesses, hour) => ({ hour, accesses })),
+              viewWeekdays: Array.from(report.viewWeekdayCounts.entries()).map(([weekday, accesses]) => ({
+                weekday,
+                accesses
+              }))
+            };
+          });
         const topReport = reportBreakdown[0] || null;
 
         const peakViewHour = findPeak(user.viewHourCounts);
@@ -576,6 +687,13 @@ export async function registerReportAnalyticsRoutes(app: FastifyInstance): Promi
     return {
       startDate: parsed.startDate,
       endDate: parsed.endDate,
+      availableUsers: availableUsers.map((user) => ({
+        id: user.id,
+        username: user.username,
+        displayName: user.displayName,
+        profileLabel: user.profileLabel
+      })),
+      selectedUserIds: activeUsers.map((user) => user.id),
       summary: {
         activeUsers: activeUsersWithActivity,
         totalViews: viewLogs.length,

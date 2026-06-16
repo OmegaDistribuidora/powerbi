@@ -1494,6 +1494,71 @@ label {
   color: var(--muted);
 }
 
+.analytics-filter-field {
+  position: relative;
+  display: grid;
+  gap: 6px;
+  min-width: 230px;
+  font-size: 0.9rem;
+  color: var(--muted);
+}
+
+.analytics-user-filter {
+  position: relative;
+}
+
+.analytics-user-filter-toggle {
+  width: 100%;
+  min-width: 230px;
+  margin-top: 0;
+  text-align: left;
+}
+
+.analytics-user-filter-panel {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 30;
+  width: min(420px, calc(100vw - 40px));
+  max-height: 520px;
+  overflow: auto;
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border-radius: 16px;
+  border: 1px solid rgba(133, 167, 255, 0.2);
+  background: rgba(8, 21, 44, 0.98);
+  box-shadow: 0 18px 42px rgba(0, 0, 0, 0.36);
+}
+
+.analytics-user-filter-all {
+  padding-bottom: 10px;
+  border-bottom: 1px solid rgba(133, 167, 255, 0.12);
+}
+
+.analytics-user-filter-groups {
+  display: grid;
+  gap: 10px;
+}
+
+.analytics-user-filter-group {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.analytics-user-filter-profile {
+  font-weight: 800;
+}
+
+.analytics-user-filter-users {
+  display: grid;
+  gap: 6px;
+  padding-left: 26px;
+}
+
 .analytics-metrics-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -1905,6 +1970,20 @@ label {
   grid-template-columns: auto minmax(0, 1fr);
   gap: 10px;
   align-items: start;
+  width: 100%;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 12px;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.analytics-user-report-row:hover,
+.analytics-user-report-row.is-selected {
+  border-color: rgba(255, 123, 44, 0.3);
+  background: rgba(255, 123, 44, 0.06);
 }
 
 .analytics-user-report-main {
@@ -1913,27 +1992,33 @@ label {
   min-width: 0;
 }
 
-.analytics-user-daily-card {
+.analytics-user-line-card {
   position: relative;
   display: grid;
   gap: 8px;
   padding-top: 4px;
 }
 
-.analytics-user-daily-scroll {
+.analytics-user-line-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.analytics-user-line-scroll {
   overflow-x: auto;
   overflow-y: visible;
 }
 
-.analytics-user-daily-chart {
+.analytics-user-line-chart {
   display: block;
-  height: 190px;
-  transition: height 0.2s ease;
+  height: 230px;
 }
 
-.analytics-user-daily-card:hover .analytics-user-daily-chart,
-.analytics-user-daily-card:focus-within .analytics-user-daily-chart {
-  height: 270px;
+.analytics-user-line-card.is-expanded .analytics-user-line-chart {
+  height: min(58vh, 520px);
 }
 
 .analytics-line {
@@ -1964,21 +2049,40 @@ label {
   fill: rgba(108, 163, 255, 0.95);
 }
 
-.analytics-user-daily-tooltip {
-  position: absolute;
-  right: 8px;
-  top: 34px;
-  z-index: 4;
+.analytics-point-summary-list {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+}
+
+.analytics-point-summary {
   display: grid;
-  gap: 3px;
-  min-width: 148px;
-  padding: 9px 10px;
-  border-radius: 12px;
-  border: 1px solid rgba(133, 167, 255, 0.18);
-  background: rgba(7, 18, 38, 0.94);
-  box-shadow: 0 14px 30px rgba(0, 0, 0, 0.32);
+  gap: 2px;
+  min-width: 72px;
+  padding: 6px 8px;
+  border-radius: 10px;
+  border: 1px solid rgba(133, 167, 255, 0.12);
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--muted);
+  font-size: 0.72rem;
+}
+
+.analytics-point-summary strong {
   color: var(--text);
-  font-size: 0.82rem;
+}
+
+.analytics-expand-chart-btn {
+  justify-self: end;
+}
+
+.analytics-chart-modal-backdrop {
+  z-index: 80;
+}
+
+.analytics-chart-modal {
+  width: calc(100vw - 40px);
+  max-height: calc(100vh - 40px);
 }
 
 .analytics-user-list {

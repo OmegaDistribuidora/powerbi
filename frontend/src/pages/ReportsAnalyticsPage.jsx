@@ -79,12 +79,24 @@ function formatDayLabel(value) {
   }).format(new Date(`${value}T12:00:00`));
 }
 
+function formatHourLabel(value) {
+  return `${String(value).padStart(2, "0")}h`;
+}
+
 function formatPercent(value) {
   return `${Math.round(value || 0)}%`;
 }
 
 function getUserActivityTotal(user) {
   return user?.totalActivity ?? (user?.totalViews || 0) + (user?.totalLogins || 0);
+}
+
+function getProfileLabel(user) {
+  return String(user?.profileLabel || "").trim() || "Sem perfil";
+}
+
+function sameDateRangeDay(startDate, endDate) {
+  return Boolean(startDate && endDate && startDate === endDate);
 }
 
 function buildSeriesTooltipData({ item, itemLabel, seriesLabel, total, users, totalFormatter }) {
@@ -175,6 +187,120 @@ function BarList({ title, items, valueFormatter, labelFormatter, meta }) {
         )}
       </div>
     </article>
+  );
+}
+
+function UserProfileFilter({ users, selectedUserIds, onChange }) {
+  const [open, setOpen] = useState(false);
+  const allUserIds = users.map((user) => user.id);
+  const selectedSet = new Set(selectedUserIds || []);
+  const allSelected = allUserIds.length > 0 && allUserIds.every((userId) => selectedSet.has(userId));
+  const selectedCount = allUserIds.filter((userId) => selectedSet.has(userId)).length;
+
+  const groups = useMemo(() => {
+    const groupMap = new Map();
+    users.forEach((user) => {
+      const profile = getProfileLabel(user);
+      if (!groupMap.has(profile)) {
+        groupMap.set(profile, []);
+      }
+      groupMap.get(profile).push(user);
+    });
+
+    return Array.from(groupMap.entries())
+      .map(([profile, groupUsers]) => ({
+        profile,
+        users: groupUsers.sort((a, b) => a.displayName.localeCompare(b.displayName))
+      }))
+      .sort((a, b) => a.profile.localeCompare(b.profile));
+  }, [users]);
+
+  function commit(nextIds) {
+    onChange(Array.from(new Set(nextIds)));
+  }
+
+  function toggleAll() {
+    commit(allSelected ? [] : allUserIds);
+  }
+
+  function toggleProfile(groupUsers) {
+    const groupIds = groupUsers.map((user) => user.id);
+    const groupSelected = groupIds.every((userId) => selectedSet.has(userId));
+    const nextSet = new Set(selectedSet);
+
+    groupIds.forEach((userId) => {
+      if (groupSelected) {
+        nextSet.delete(userId);
+      } else {
+        nextSet.add(userId);
+      }
+    });
+
+    commit(Array.from(nextSet));
+  }
+
+  function toggleUser(userId) {
+    const nextSet = new Set(selectedSet);
+    if (nextSet.has(userId)) {
+      nextSet.delete(userId);
+    } else {
+      nextSet.add(userId);
+    }
+    commit(Array.from(nextSet));
+  }
+
+  const label = allSelected
+    ? "Todos os usuarios"
+    : selectedCount
+      ? `${selectedCount} usuario${selectedCount === 1 ? "" : "s"}`
+      : "Nenhum usuario";
+
+  return (
+    <div className="analytics-user-filter">
+      <button type="button" className="secondary-btn analytics-user-filter-toggle" onClick={() => setOpen((current) => !current)}>
+        {label}
+      </button>
+      {open ? (
+        <div className="analytics-user-filter-panel">
+          <label className="check-row analytics-user-filter-all">
+            <input type="checkbox" checked={allSelected} onChange={toggleAll} />
+            <span>Marcar todos</span>
+          </label>
+
+          <div className="analytics-user-filter-groups">
+            {groups.map((group) => {
+              const groupIds = group.users.map((user) => user.id);
+              const groupSelected = groupIds.length > 0 && groupIds.every((userId) => selectedSet.has(userId));
+              const groupPartial = groupIds.some((userId) => selectedSet.has(userId)) && !groupSelected;
+
+              return (
+                <section key={group.profile} className="analytics-user-filter-group">
+                  <label className="check-row analytics-user-filter-profile">
+                    <input
+                      type="checkbox"
+                      checked={groupSelected}
+                      ref={(input) => {
+                        if (input) input.indeterminate = groupPartial;
+                      }}
+                      onChange={() => toggleProfile(group.users)}
+                    />
+                    <span>{group.profile}</span>
+                  </label>
+                  <div className="analytics-user-filter-users">
+                    {group.users.map((user) => (
+                      <label key={user.id} className="check-row">
+                        <input type="checkbox" checked={selectedSet.has(user.id)} onChange={() => toggleUser(user.id)} />
+                        <span>{user.displayName}</span>
+                      </label>
+                    ))}
+                  </div>
+                </section>
+              );
+            })}
+          </div>
+        </div>
+      ) : null}
+    </div>
   );
 }
 
@@ -396,12 +522,29 @@ function ActivityDonut({ user }) {
   );
 }
 
-function UserDailyLineChart({ user }) {
-  const [hoveredPoint, setHoveredPoint] = useState(null);
-  const items = user?.activityByDay || [];
-  const width = Math.max(420, items.length * 44);
-  const height = 190;
-  const padding = { top: 18, right: 22, bottom: 42, left: 34 };
+function UserActivityLineChart({ user, report, startDate, endDate, expanded = false, onExpand }) {
+  const hourly = sameDateRangeDay(startDate, endDate);
+  const userDailyByDate = new Map((user?.activityByDay || []).map((item) => [item.date, item]));
+  const reportDailyByDate = new Map((report?.activityByDay || []).map((item) => [item.date, item]));
+  const userLoginHours = new Map((user?.loginHours || []).map((item) => [item.hour, item.logins || 0]));
+  const userViewHours = new Map((user?.viewHours || []).map((item) => [item.hour, item.accesses || 0]));
+  const reportViewHours = new Map((report?.viewHours || []).map((item) => [item.hour, item.accesses || 0]));
+  const items = hourly
+    ? Array.from({ length: 24 }, (_, hour) => ({
+        key: String(hour),
+        label: formatHourLabel(hour),
+        views: report ? reportViewHours.get(hour) || 0 : userViewHours.get(hour) || 0,
+        logins: userLoginHours.get(hour) || 0
+      }))
+    : (user?.activityByDay || []).map((item) => ({
+        key: item.date,
+        label: formatDayLabel(item.date),
+        views: report ? reportDailyByDate.get(item.date)?.views || 0 : item.views || 0,
+        logins: userDailyByDate.get(item.date)?.logins || 0
+      }));
+  const width = Math.max(expanded ? 920 : 420, items.length * (hourly ? 34 : 52));
+  const height = expanded ? 360 : 210;
+  const padding = { top: 24, right: 28, bottom: 48, left: 38 };
   const chartWidth = width - padding.left - padding.right;
   const chartHeight = height - padding.top - padding.bottom;
   const maxValue = Math.max(1, ...items.flatMap((item) => [item.views || 0, item.logins || 0]));
@@ -427,24 +570,27 @@ function UserDailyLineChart({ user }) {
   }
 
   return (
-    <div className="analytics-user-daily-card">
-      <div className="analytics-legend">
-        <span className="analytics-legend-item">
-          <span className="analytics-legend-swatch analytics-legend-swatch-primary" />
-          <span className="muted small">Aberturas</span>
-        </span>
-        <span className="analytics-legend-item">
-          <span className="analytics-legend-swatch analytics-legend-swatch-secondary" />
-          <span className="muted small">Logins</span>
-        </span>
+    <div className={`analytics-user-line-card${expanded ? " is-expanded" : ""}`}>
+      <div className="analytics-user-line-header">
+        <div className="analytics-legend">
+          <span className="analytics-legend-item">
+            <span className="analytics-legend-swatch analytics-legend-swatch-primary" />
+            <span className="muted small">Aberturas</span>
+          </span>
+          <span className="analytics-legend-item">
+            <span className="analytics-legend-swatch analytics-legend-swatch-secondary" />
+            <span className="muted small">Logins</span>
+          </span>
+        </div>
+        <span className="muted small">{hourly ? "Por hora" : "Por dia"}</span>
       </div>
-      <div className="analytics-user-daily-scroll">
+      <div className="analytics-user-line-scroll">
         <svg
-          className="analytics-user-daily-chart"
+          className="analytics-user-line-chart"
           viewBox={`0 0 ${width} ${height}`}
           style={{ width: `max(100%, ${width}px)` }}
           role="img"
-          aria-label="Acessos por dia no periodo selecionado"
+          aria-label={hourly ? "Acessos por hora no periodo selecionado" : "Acessos por dia no periodo selecionado"}
         >
           {[0, 0.5, 1].map((tick) => {
             const y = padding.top + chartHeight - chartHeight * tick;
@@ -464,29 +610,30 @@ function UserDailyLineChart({ user }) {
           {items.map((item, index) => {
             const viewPoint = pointFor(item, index, "views");
             const loginPoint = pointFor(item, index, "logins");
-            const showLabel = items.length <= 10 || index === 0 || index === items.length - 1 || index % Math.ceil(items.length / 8) === 0;
+            const showLabel =
+              expanded ||
+              items.length <= 10 ||
+              index === 0 ||
+              index === items.length - 1 ||
+              index % Math.ceil(items.length / 8) === 0;
 
             return (
-              <g key={item.date}>
+              <g key={item.key}>
                 <circle
                   cx={viewPoint.x}
                   cy={viewPoint.y}
                   r="4"
                   className="analytics-line-dot analytics-line-dot-views"
-                  onMouseEnter={() => setHoveredPoint(item)}
-                  onMouseLeave={() => setHoveredPoint(null)}
                 />
                 <circle
                   cx={loginPoint.x}
                   cy={loginPoint.y}
                   r="4"
                   className="analytics-line-dot analytics-line-dot-logins"
-                  onMouseEnter={() => setHoveredPoint(item)}
-                  onMouseLeave={() => setHoveredPoint(null)}
                 />
                 {showLabel ? (
                   <text x={viewPoint.x} y={height - 14} textAnchor="middle" className="analytics-axis-text analytics-axis-x">
-                    {formatDayLabel(item.date)}
+                    {item.label}
                   </text>
                 ) : null}
               </g>
@@ -494,18 +641,25 @@ function UserDailyLineChart({ user }) {
           })}
         </svg>
       </div>
-      {hoveredPoint ? (
-        <div className="analytics-user-daily-tooltip">
-          <strong>{formatDayLabel(hoveredPoint.date)}</strong>
-          <span>{formatAccessLabel(hoveredPoint.views || 0)}</span>
-          <span>{formatLoginLabel(hoveredPoint.logins || 0)}</span>
-        </div>
+      <div className="analytics-point-summary-list">
+        {items.map((item) => (
+          <div key={item.key} className="analytics-point-summary">
+            <strong>{item.label}</strong>
+            <span>{item.views || 0} ab.</span>
+            <span>{item.logins || 0} log.</span>
+          </div>
+        ))}
+      </div>
+      {onExpand ? (
+        <button type="button" className="secondary-btn compact-btn analytics-expand-chart-btn" onClick={onExpand}>
+          Expandir grafico
+        </button>
       ) : null}
     </div>
   );
 }
 
-function UserReportBreakdown({ user }) {
+function UserReportBreakdown({ user, selectedReportId, onSelectReport }) {
   const items = user?.reportBreakdown || [];
   const maxValue = Math.max(1, ...items.map((item) => item.accesses || 0));
 
@@ -513,12 +667,19 @@ function UserReportBreakdown({ user }) {
     <div className="analytics-user-report-list">
       {items.length ? (
         items.slice(0, 8).map((item, index) => (
-          <div key={item.reportId} className="analytics-user-report-row">
+          <button
+            key={item.reportId}
+            type="button"
+            className={`analytics-user-report-row${selectedReportId === item.reportId ? " is-selected" : ""}`}
+            onClick={() => onSelectReport(item.reportId)}
+          >
             <span className="analytics-rank-number">{index + 1}</span>
             <div className="analytics-user-report-main">
               <div className="analytics-row-head">
                 <strong>{item.reportName}</strong>
-                <span className="muted small">{formatAccessLabel(item.accesses)}</span>
+                <span className="muted small">
+                  {formatAccessLabel(item.accesses)} | {formatMinutes(item.averageMinutes)}
+                </span>
               </div>
               <div className="analytics-bar-track">
                 <div
@@ -528,7 +689,7 @@ function UserReportBreakdown({ user }) {
               </div>
               <span className="muted small">{item.categoryName || "Sem categoria"}</span>
             </div>
-          </div>
+          </button>
         ))
       ) : (
         <p className="muted">Este usuario fez login no periodo, mas nao abriu paineis.</p>
@@ -599,7 +760,15 @@ function ActiveUsersRanking({ users, selectedUserId, onSelect }) {
   );
 }
 
-function UserDetailPanel({ user }) {
+function UserDetailPanel({ user, startDate, endDate }) {
+  const [selectedReportId, setSelectedReportId] = useState(null);
+  const [chartExpanded, setChartExpanded] = useState(false);
+
+  useEffect(() => {
+    setSelectedReportId(null);
+    setChartExpanded(false);
+  }, [user?.userId, startDate, endDate]);
+
   if (!user) {
     return (
       <article className="page-card analytics-card analytics-card-compact analytics-user-detail-empty">
@@ -609,8 +778,20 @@ function UserDetailPanel({ user }) {
     );
   }
 
+  const selectedReport = (user.reportBreakdown || []).find((report) => report.reportId === selectedReportId) || null;
   const totalActivity = getUserActivityTotal(user);
   const reportCoverage = user.uniqueReports ? `${user.uniqueReports} ${user.uniqueReports === 1 ? "painel" : "paineis"}` : "Nenhum painel";
+  const patternTitle = selectedReport ? selectedReport.reportName : "Todos os paineis";
+  const peakHour = selectedReport?.peakHour || user.peakHour;
+  const peakHourAccesses = selectedReport?.peakHourAccesses ?? user.peakHourAccesses;
+  const peakWeekday = selectedReport?.peakWeekday || user.peakWeekday;
+  const peakWeekdayAccesses = selectedReport?.peakWeekdayAccesses ?? user.peakWeekdayAccesses;
+  const firstActivityAt = selectedReport?.firstViewAt || user.firstActivityAt;
+  const lastActivityAt = selectedReport?.lastViewAt || user.lastActivityAt;
+
+  function handleSelectReport(reportId) {
+    setSelectedReportId((current) => (current === reportId ? null : reportId));
+  }
 
   return (
     <article className="page-card analytics-card analytics-card-compact analytics-user-detail-card">
@@ -645,18 +826,21 @@ function UserDetailPanel({ user }) {
         <div className="analytics-user-panel">
           <div className="header-line">
             <h3>Paineis mais abertos</h3>
-            <span className="muted small">{user.topReportName}</span>
+            <span className="muted small">{selectedReport ? "Filtrado" : user.topReportName}</span>
           </div>
-          <UserReportBreakdown user={user} />
+          <UserReportBreakdown user={user} selectedReportId={selectedReport?.reportId || null} onSelectReport={handleSelectReport} />
         </div>
 
         <div className="analytics-user-panel">
-          <h3>Padrao de uso</h3>
+          <div className="header-line">
+            <h3>Padrao de uso</h3>
+            <span className="tag-chip tag-chip-muted">{patternTitle}</span>
+          </div>
           <div className="analytics-user-peak-grid">
             <div>
               <span className="muted small">Pico de painel</span>
-              <strong>{user.peakHour}</strong>
-              <span className="muted small">{formatWeekdayLabel(user.peakWeekday)} - {formatAccessLabel(user.peakWeekdayAccesses)}</span>
+              <strong>{peakHour}</strong>
+              <span className="muted small">{formatWeekdayLabel(peakWeekday)} - {formatAccessLabel(peakWeekdayAccesses)}</span>
             </div>
             <div>
               <span className="muted small">Pico de login</span>
@@ -665,16 +849,45 @@ function UserDetailPanel({ user }) {
             </div>
             <div>
               <span className="muted small">Primeira atividade</span>
-              <strong>{formatDateTime(user.firstActivityAt)}</strong>
+              <strong>{formatDateTime(firstActivityAt)}</strong>
             </div>
             <div>
               <span className="muted small">Ultima atividade</span>
-              <strong>{formatDateTime(user.lastActivityAt)}</strong>
+              <strong>{formatDateTime(lastActivityAt)}</strong>
             </div>
           </div>
-          <UserDailyLineChart user={user} />
+          <UserActivityLineChart
+            user={user}
+            report={selectedReport}
+            startDate={startDate}
+            endDate={endDate}
+            onExpand={() => setChartExpanded(true)}
+          />
         </div>
       </div>
+
+      {chartExpanded ? (
+        <div className="modal-backdrop analytics-chart-modal-backdrop" role="presentation" onClick={() => setChartExpanded(false)}>
+          <section
+            className="modal-card analytics-chart-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Grafico expandido"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="modal-header">
+              <div>
+                <div className="eyebrow">Padrao de uso</div>
+                <h2>{patternTitle}</h2>
+              </div>
+              <button type="button" className="icon-btn" onClick={() => setChartExpanded(false)} aria-label="Fechar grafico">
+                x
+              </button>
+            </div>
+            <UserActivityLineChart user={user} report={selectedReport} startDate={startDate} endDate={endDate} expanded />
+          </section>
+        </div>
+      ) : null}
     </article>
   );
 }
@@ -685,6 +898,7 @@ export default function ReportsAnalyticsPage() {
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState(null);
   const [selectedUserId, setSelectedUserId] = useState(null);
+  const [selectedFilterUserIds, setSelectedFilterUserIds] = useState(null);
   const [filters, setFilters] = useState(() => {
     const end = new Date();
     const start = new Date(end.getTime() - 6 * 24 * 60 * 60 * 1000);
@@ -694,13 +908,17 @@ export default function ReportsAnalyticsPage() {
     };
   });
 
-  async function loadAnalytics(currentFilters = filters) {
+  async function loadAnalytics(currentFilters = filters, currentUserIds = selectedFilterUserIds) {
     setLoading(true);
     try {
-      const payload = await apiJson(
-        `/report-analytics?startDate=${currentFilters.startDate}&endDate=${currentFilters.endDate}`,
-        { token }
-      );
+      const params = new URLSearchParams({
+        startDate: currentFilters.startDate,
+        endDate: currentFilters.endDate
+      });
+      if (Array.isArray(currentUserIds)) {
+        params.set("userIds", currentUserIds.join(","));
+      }
+      const payload = await apiJson(`/report-analytics?${params.toString()}`, { token });
       setData(payload);
       setError("");
     } catch (requestError) {
@@ -713,6 +931,29 @@ export default function ReportsAnalyticsPage() {
   useEffect(() => {
     loadAnalytics(filters);
   }, [token]);
+
+  useEffect(() => {
+    const availableUsers = data?.availableUsers || [];
+    if (!data) {
+      return;
+    }
+    if (!availableUsers.length) {
+      setSelectedFilterUserIds([]);
+      return;
+    }
+
+    const availableIds = availableUsers.map((user) => user.id);
+    if (selectedFilterUserIds == null) {
+      setSelectedFilterUserIds(availableIds);
+      return;
+    }
+
+    const availableIdSet = new Set(availableIds);
+    const sanitized = selectedFilterUserIds.filter((userId) => availableIdSet.has(userId));
+    if (sanitized.length !== selectedFilterUserIds.length) {
+      setSelectedFilterUserIds(sanitized);
+    }
+  }, [data?.availableUsers, selectedFilterUserIds]);
 
   useEffect(() => {
     const users = data?.userStats || [];
@@ -788,6 +1029,9 @@ export default function ReportsAnalyticsPage() {
 
   const activeUsers = data?.userStats || [];
   const selectedUser = activeUsers.find((user) => user.userId === selectedUserId) || activeUsers[0] || null;
+  const availableUsers = data?.availableUsers || [];
+  const effectiveSelectedFilterUserIds =
+    selectedFilterUserIds == null ? availableUsers.map((user) => user.id) : selectedFilterUserIds;
 
   const accessedReportsSummary = data?.summary
     ? `${data.summary.accessedReports}/${data.summary.activeReports} (${data.summary.accessedReportsRate}%)`
@@ -805,7 +1049,7 @@ export default function ReportsAnalyticsPage() {
             className="analytics-filter-bar"
             onSubmit={(event) => {
               event.preventDefault();
-              loadAnalytics(filters);
+              loadAnalytics(filters, effectiveSelectedFilterUserIds);
             }}
           >
             <label>
@@ -824,6 +1068,14 @@ export default function ReportsAnalyticsPage() {
                 onChange={(event) => setFilters((current) => ({ ...current, endDate: event.target.value }))}
               />
             </label>
+            <div className="analytics-filter-field">
+              <span>Usuarios/perfis</span>
+              <UserProfileFilter
+                users={availableUsers}
+                selectedUserIds={effectiveSelectedFilterUserIds}
+                onChange={setSelectedFilterUserIds}
+              />
+            </div>
             <button type="submit" className="secondary-btn" disabled={loading}>
               {loading ? "Atualizando..." : "Aplicar"}
             </button>
@@ -863,7 +1115,7 @@ export default function ReportsAnalyticsPage() {
 
       <section className="analytics-user-insights">
         <ActiveUsersRanking users={activeUsers} selectedUserId={selectedUser?.userId || null} onSelect={setSelectedUserId} />
-        <UserDetailPanel user={selectedUser} />
+        <UserDetailPanel user={selectedUser} startDate={data?.startDate || filters.startDate} endDate={data?.endDate || filters.endDate} />
       </section>
 
       <section className="analytics-grid">
