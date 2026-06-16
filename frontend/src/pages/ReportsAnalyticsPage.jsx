@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useAuth } from "../components/AuthProvider";
 import { apiJson } from "../services/api";
@@ -190,8 +190,9 @@ function BarList({ title, items, valueFormatter, labelFormatter, meta }) {
   );
 }
 
-function UserProfileFilter({ users, selectedUserIds, onChange }) {
+function UserProfileFilter({ users, selectedUserIds, onChange, closeSignal }) {
   const [open, setOpen] = useState(false);
+  const filterRef = useRef(null);
   const allUserIds = users.map((user) => user.id);
   const selectedSet = new Set(selectedUserIds || []);
   const allSelected = allUserIds.length > 0 && allUserIds.every((userId) => selectedSet.has(userId));
@@ -214,6 +215,25 @@ function UserProfileFilter({ users, selectedUserIds, onChange }) {
       }))
       .sort((a, b) => a.profile.localeCompare(b.profile));
   }, [users]);
+
+  useEffect(() => {
+    if (!open) {
+      return undefined;
+    }
+
+    function handlePointerDown(event) {
+      if (filterRef.current && !filterRef.current.contains(event.target)) {
+        setOpen(false);
+      }
+    }
+
+    document.addEventListener("mousedown", handlePointerDown);
+    return () => document.removeEventListener("mousedown", handlePointerDown);
+  }, [open]);
+
+  useEffect(() => {
+    setOpen(false);
+  }, [closeSignal]);
 
   function commit(nextIds) {
     onChange(Array.from(new Set(nextIds)));
@@ -256,7 +276,7 @@ function UserProfileFilter({ users, selectedUserIds, onChange }) {
       : "Nenhum usuario";
 
   return (
-    <div className="analytics-user-filter">
+    <div className="analytics-user-filter" ref={filterRef}>
       <button type="button" className="secondary-btn analytics-user-filter-toggle" onClick={() => setOpen((current) => !current)}>
         {label}
       </button>
@@ -899,6 +919,7 @@ export default function ReportsAnalyticsPage() {
   const [data, setData] = useState(null);
   const [selectedUserId, setSelectedUserId] = useState(null);
   const [selectedFilterUserIds, setSelectedFilterUserIds] = useState(null);
+  const [filterCloseSignal, setFilterCloseSignal] = useState(0);
   const [filters, setFilters] = useState(() => {
     const end = new Date();
     const start = new Date(end.getTime() - 6 * 24 * 60 * 60 * 1000);
@@ -1049,6 +1070,7 @@ export default function ReportsAnalyticsPage() {
             className="analytics-filter-bar"
             onSubmit={(event) => {
               event.preventDefault();
+              setFilterCloseSignal((current) => current + 1);
               loadAnalytics(filters, effectiveSelectedFilterUserIds);
             }}
           >
@@ -1074,6 +1096,7 @@ export default function ReportsAnalyticsPage() {
                 users={availableUsers}
                 selectedUserIds={effectiveSelectedFilterUserIds}
                 onChange={setSelectedFilterUserIds}
+                closeSignal={filterCloseSignal}
               />
             </div>
             <button type="submit" className="secondary-btn" disabled={loading}>
