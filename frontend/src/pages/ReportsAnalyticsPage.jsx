@@ -562,9 +562,9 @@ function UserActivityLineChart({ user, report, startDate, endDate, expanded = fa
         views: report ? reportDailyByDate.get(item.date)?.views || 0 : item.views || 0,
         logins: userDailyByDate.get(item.date)?.logins || 0
       }));
-  const width = Math.max(expanded ? 920 : 420, items.length * (hourly ? 34 : 52));
-  const height = expanded ? 360 : 210;
-  const padding = { top: 24, right: 28, bottom: 48, left: 38 };
+  const width = Math.max(expanded ? 920 : 420, items.length * (hourly ? 46 : 58));
+  const height = expanded ? 380 : 230;
+  const padding = { top: 40, right: 28, bottom: 48, left: 38 };
   const chartWidth = width - padding.left - padding.right;
   const chartHeight = height - padding.top - padding.bottom;
   const maxValue = Math.max(1, ...items.flatMap((item) => [item.views || 0, item.logins || 0]));
@@ -587,6 +587,12 @@ function UserActivityLineChart({ user, report, startDate, endDate, expanded = fa
         return `${index === 0 ? "M" : "L"} ${point.x} ${point.y}`;
       })
       .join(" ");
+  }
+
+  function valueLabelY(point, item, key) {
+    const sameValue = (item.views || 0) === (item.logins || 0);
+    const offset = key === "views" ? -10 : sameValue ? 18 : -10;
+    return Math.min(height - padding.bottom + 18, Math.max(14, point.y + offset));
   }
 
   return (
@@ -645,12 +651,28 @@ function UserActivityLineChart({ user, report, startDate, endDate, expanded = fa
                   r="4"
                   className="analytics-line-dot analytics-line-dot-views"
                 />
+                <text
+                  x={viewPoint.x}
+                  y={valueLabelY(viewPoint, item, "views")}
+                  textAnchor="middle"
+                  className="analytics-point-value analytics-point-value-views"
+                >
+                  {item.views || 0}
+                </text>
                 <circle
                   cx={loginPoint.x}
                   cy={loginPoint.y}
                   r="4"
                   className="analytics-line-dot analytics-line-dot-logins"
                 />
+                <text
+                  x={loginPoint.x}
+                  y={valueLabelY(loginPoint, item, "logins")}
+                  textAnchor="middle"
+                  className="analytics-point-value analytics-point-value-logins"
+                >
+                  {item.logins || 0}
+                </text>
                 {showLabel ? (
                   <text x={viewPoint.x} y={height - 14} textAnchor="middle" className="analytics-axis-text analytics-axis-x">
                     {item.label}
@@ -660,15 +682,6 @@ function UserActivityLineChart({ user, report, startDate, endDate, expanded = fa
             );
           })}
         </svg>
-      </div>
-      <div className="analytics-point-summary-list">
-        {items.map((item) => (
-          <div key={item.key} className="analytics-point-summary">
-            <strong>{item.label}</strong>
-            <span>{item.views || 0} ab.</span>
-            <span>{item.logins || 0} log.</span>
-          </div>
-        ))}
       </div>
       {onExpand ? (
         <button type="button" className="secondary-btn compact-btn analytics-expand-chart-btn" onClick={onExpand}>

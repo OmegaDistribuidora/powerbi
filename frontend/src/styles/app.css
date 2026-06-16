@@ -2060,27 +2060,20 @@ label {
   fill: rgba(108, 163, 255, 0.95);
 }
 
-.analytics-point-summary-list {
-  display: flex;
-  gap: 6px;
-  overflow-x: auto;
-  padding-bottom: 2px;
+.analytics-point-value {
+  font-size: 0.74rem;
+  font-weight: 800;
+  paint-order: stroke;
+  stroke: rgba(8, 18, 37, 0.95);
+  stroke-width: 4px;
 }
 
-.analytics-point-summary {
-  display: grid;
-  gap: 2px;
-  min-width: 72px;
-  padding: 6px 8px;
-  border-radius: 10px;
-  border: 1px solid rgba(133, 167, 255, 0.12);
-  background: rgba(255, 255, 255, 0.03);
-  color: var(--muted);
-  font-size: 0.72rem;
+.analytics-point-value-views {
+  fill: rgba(255, 123, 44, 0.98);
 }
 
-.analytics-point-summary strong {
-  color: var(--text);
+.analytics-point-value-logins {
+  fill: rgba(108, 163, 255, 0.98);
 }
 
 .analytics-expand-chart-btn {
