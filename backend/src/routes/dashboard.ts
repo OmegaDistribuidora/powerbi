@@ -1,5 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import prisma from "../lib/prisma";
+import { serializeModuleAccess } from "../lib/modules";
 import { requireAuth } from "../lib/security";
 
 export async function registerDashboardRoutes(app: FastifyInstance): Promise<void> {
@@ -23,6 +24,9 @@ export async function registerDashboardRoutes(app: FastifyInstance): Promise<voi
         },
         filterRules: {
           orderBy: [{ reportId: "asc" }, { tableName: "asc" }, { columnName: "asc" }]
+        },
+        moduleAccesses: {
+          select: { module: true }
         }
       }
     } as any)) as any;
@@ -76,7 +80,8 @@ export async function registerDashboardRoutes(app: FastifyInstance): Promise<voi
         username: user.username,
         displayName: user.displayName,
         profileLabel: user.profileLabel,
-        role: user.role
+        role: user.role,
+        moduleAccess: serializeModuleAccess(user.role, user.moduleAccesses)
       },
       summary: {
         reportsCount: reports.length,

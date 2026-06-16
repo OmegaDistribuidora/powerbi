@@ -4,6 +4,7 @@ import { z } from "zod";
 import { env } from "../config";
 import prisma from "../lib/prisma";
 import { recordAudit } from "../lib/audit";
+import { serializeModuleAccess, type ModuleKey } from "../lib/modules";
 import { comparePassword, hashPassword, requireAuth, signToken } from "../lib/security";
 
 const loginSchema = z.object({
@@ -54,6 +55,7 @@ function serializeUser(user: {
   profileLabel: string | null;
   role: "ADMIN" | "USER";
   active: boolean;
+  moduleAccesses?: Array<{ module: ModuleKey | string }>;
 }) {
   return {
     id: user.id,
@@ -61,7 +63,8 @@ function serializeUser(user: {
     displayName: user.displayName,
     profileLabel: user.profileLabel,
     role: user.role,
-    active: user.active
+    active: user.active,
+    moduleAccess: serializeModuleAccess(user.role, user.moduleAccesses)
   };
 }
 
@@ -110,7 +113,14 @@ export async function registerAuthRoutes(app: FastifyInstance): Promise<void> {
     }
 
     const username = parsed.data.username.trim().toLowerCase();
-    const user = await prisma.user.findUnique({ where: { username } });
+    const user = await prisma.user.findUnique({
+      where: { username },
+      include: {
+        moduleAccesses: {
+          select: { module: true }
+        }
+      }
+    } as any);
 
     if (!user || !user.active) {
       return reply.code(401).send({ message: "Credenciais invalidas." });
@@ -201,7 +211,14 @@ export async function registerAuthRoutes(app: FastifyInstance): Promise<void> {
       return reply.code(400).send({ message: "Token SSO sem login de destino." });
     }
 
-    const user = await prisma.user.findUnique({ where: { username: targetLogin } });
+    const user = await prisma.user.findUnique({
+      where: { username: targetLogin },
+      include: {
+        moduleAccesses: {
+          select: { module: true }
+        }
+      }
+    } as any);
     if (!user || !user.active) {
       return reply.code(401).send({ message: "Usuario alvo nao encontrado ou inativo." });
     }
@@ -277,15 +294,18 @@ export async function registerAuthRoutes(app: FastifyInstance): Promise<void> {
         profileLabel: true,
         role: true,
         active: true,
-        createdAt: true
+        createdAt: true,
+        moduleAccesses: {
+          select: { module: true }
+        }
       }
-    });
+    } as any);
 
     if (!user || !user.active) {
       return reply.code(404).send({ message: "Usuario nao encontrado." });
     }
 
-    return { user };
+    return { user: serializeUser(user as any) };
   });
 
   app.post("/api/auth/change-password", { preHandler: [requireAuth] }, async (request, reply) => {

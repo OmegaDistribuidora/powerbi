@@ -106,19 +106,15 @@ export default function MappingPage() {
   useEffect(() => {
     let active = true;
 
-    Promise.all([
-      apiJson("/reports", { token }),
-      apiJson("/users", { token }),
-      apiJson("/report-categories", { token })
-    ])
-      .then(([reportsPayload, usersPayload, categoriesPayload]) => {
+    apiJson("/module-data/mapping", { token })
+      .then((payload) => {
         if (!active) {
           return;
         }
 
-        setReports(reportsPayload.reports || []);
-        setUsers(usersPayload.users || []);
-        setCategories(categoriesPayload.categories || []);
+        setReports(payload.reports || []);
+        setUsers(payload.users || []);
+        setCategories(payload.categories || []);
       })
       .catch((requestError) => {
         if (active) {

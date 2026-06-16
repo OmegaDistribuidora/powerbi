@@ -2,6 +2,7 @@ import { Navigate, Route, Routes } from "react-router-dom";
 import AppLayout from "./components/AppLayout";
 import ProtectedRoute from "./components/ProtectedRoute";
 import AdminRoute from "./components/AdminRoute";
+import ModuleRoute from "./components/ModuleRoute";
 import DashboardPage from "./pages/DashboardPage";
 import LoginPage from "./pages/LoginPage";
 import AdminPage from "./pages/AdminPage";
@@ -35,25 +36,25 @@ export default function App() {
         <Route
           path="audit"
           element={
-            <AdminRoute>
+            <ModuleRoute moduleKey="AUDIT">
               <AuditPage />
-            </AdminRoute>
+            </ModuleRoute>
           }
         />
         <Route
           path="mapping"
           element={
-            <AdminRoute>
+            <ModuleRoute moduleKey="MAPPING">
               <MappingPage />
-            </AdminRoute>
+            </ModuleRoute>
           }
         />
         <Route
           path="reports-analytics"
           element={
-            <AdminRoute>
+            <ModuleRoute moduleKey="REPORTS_ANALYTICS">
               <ReportsAnalyticsPage />
-            </AdminRoute>
+            </ModuleRoute>
           }
         />
       </Route>

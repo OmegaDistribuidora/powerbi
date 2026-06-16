@@ -2,6 +2,7 @@
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { useAuth } from "./AuthProvider";
 import { apiJson } from "../services/api";
+import { MODULES, hasModuleAccess } from "../modules";
 import logo from "../assets/logo.png";
 
 function PasswordModal({ onClose, onSubmit, saving, error, success, isAdmin, users, currentUserId }) {
@@ -309,17 +310,13 @@ export default function AppLayout() {
               <NavLink to="/admin" className="nav-link">
                 Administração
               </NavLink>
-              <NavLink to="/mapping" className="nav-link">
-                Mapeamento de painéis
-              </NavLink>
-              <NavLink to="/reports-analytics" className="nav-link">
-                Relatórios
-              </NavLink>
-              <NavLink to="/audit" className="nav-link">
-                Auditoria
-              </NavLink>
             </>
           ) : null}
+          {MODULES.filter((module) => hasModuleAccess(user, module.key)).map((module) => (
+            <NavLink key={module.key} to={module.path} className="nav-link">
+              {module.label}
+            </NavLink>
+          ))}
         </nav>
 
         <div className="sidebar-foot">

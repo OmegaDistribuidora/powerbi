@@ -68,23 +68,23 @@ function formatDateTime(value) {
   }).format(new Date(value));
 }
 
+function formatDayLabel(value) {
+  if (!value) {
+    return "";
+  }
+
+  return new Intl.DateTimeFormat("pt-BR", {
+    day: "2-digit",
+    month: "2-digit"
+  }).format(new Date(`${value}T12:00:00`));
+}
+
 function formatPercent(value) {
   return `${Math.round(value || 0)}%`;
 }
 
 function getUserActivityTotal(user) {
   return user?.totalActivity ?? (user?.totalViews || 0) + (user?.totalLogins || 0);
-}
-
-function combineUserHours(user) {
-  const views = new Map((user?.viewHours || []).map((item) => [item.hour, item.accesses || 0]));
-  const logins = new Map((user?.loginHours || []).map((item) => [item.hour, item.logins || 0]));
-
-  return Array.from({ length: 24 }, (_, hour) => ({
-    hour,
-    views: views.get(hour) || 0,
-    logins: logins.get(hour) || 0
-  }));
 }
 
 function buildSeriesTooltipData({ item, itemLabel, seriesLabel, total, users, totalFormatter }) {
@@ -396,30 +396,111 @@ function ActivityDonut({ user }) {
   );
 }
 
-function UserHourBars({ user }) {
-  const items = combineUserHours(user);
-  const maxValue = Math.max(1, ...items.map((item) => item.views + item.logins));
+function UserDailyLineChart({ user }) {
+  const [hoveredPoint, setHoveredPoint] = useState(null);
+  const items = user?.activityByDay || [];
+  const width = Math.max(420, items.length * 44);
+  const height = 190;
+  const padding = { top: 18, right: 22, bottom: 42, left: 34 };
+  const chartWidth = width - padding.left - padding.right;
+  const chartHeight = height - padding.top - padding.bottom;
+  const maxValue = Math.max(1, ...items.flatMap((item) => [item.views || 0, item.logins || 0]));
+
+  function pointFor(item, index, key) {
+    const denominator = Math.max(1, items.length - 1);
+    const x = padding.left + (index / denominator) * chartWidth;
+    const y = padding.top + chartHeight - ((item[key] || 0) / maxValue) * chartHeight;
+    return { x, y };
+  }
+
+  function buildPath(key) {
+    if (!items.length) {
+      return "";
+    }
+
+    return items
+      .map((item, index) => {
+        const point = pointFor(item, index, key);
+        return `${index === 0 ? "M" : "L"} ${point.x} ${point.y}`;
+      })
+      .join(" ");
+  }
 
   return (
-    <div className="analytics-user-hour-chart" aria-label="Distribuicao de atividade por hora">
-      {items.map((item) => {
-        const total = item.views + item.logins;
-        return (
-          <div key={item.hour} className="analytics-user-hour-column" title={`${String(item.hour).padStart(2, "0")}h: ${formatCount(total, "evento", "eventos")}`}>
-            <div className="analytics-user-hour-bar">
-              <span
-                className="analytics-user-hour-fill analytics-user-hour-fill-view"
-                style={{ height: `${item.views ? Math.max(8, (item.views / maxValue) * 100) : 0}%` }}
-              />
-              <span
-                className="analytics-user-hour-fill analytics-user-hour-fill-login"
-                style={{ height: `${item.logins ? Math.max(8, (item.logins / maxValue) * 100) : 0}%` }}
-              />
-            </div>
-            <span>{String(item.hour).padStart(2, "0")}</span>
-          </div>
-        );
-      })}
+    <div className="analytics-user-daily-card">
+      <div className="analytics-legend">
+        <span className="analytics-legend-item">
+          <span className="analytics-legend-swatch analytics-legend-swatch-primary" />
+          <span className="muted small">Aberturas</span>
+        </span>
+        <span className="analytics-legend-item">
+          <span className="analytics-legend-swatch analytics-legend-swatch-secondary" />
+          <span className="muted small">Logins</span>
+        </span>
+      </div>
+      <div className="analytics-user-daily-scroll">
+        <svg
+          className="analytics-user-daily-chart"
+          viewBox={`0 0 ${width} ${height}`}
+          style={{ width: `max(100%, ${width}px)` }}
+          role="img"
+          aria-label="Acessos por dia no periodo selecionado"
+        >
+          {[0, 0.5, 1].map((tick) => {
+            const y = padding.top + chartHeight - chartHeight * tick;
+            return (
+              <g key={tick}>
+                <line x1={padding.left} y1={y} x2={width - padding.right} y2={y} className="analytics-grid-line" />
+                <text x={0} y={y + 4} className="analytics-axis-text analytics-axis-y">
+                  {Math.round(maxValue * tick)}
+                </text>
+              </g>
+            );
+          })}
+
+          <path d={buildPath("views")} className="analytics-line analytics-line-views" />
+          <path d={buildPath("logins")} className="analytics-line analytics-line-logins" />
+
+          {items.map((item, index) => {
+            const viewPoint = pointFor(item, index, "views");
+            const loginPoint = pointFor(item, index, "logins");
+            const showLabel = items.length <= 10 || index === 0 || index === items.length - 1 || index % Math.ceil(items.length / 8) === 0;
+
+            return (
+              <g key={item.date}>
+                <circle
+                  cx={viewPoint.x}
+                  cy={viewPoint.y}
+                  r="4"
+                  className="analytics-line-dot analytics-line-dot-views"
+                  onMouseEnter={() => setHoveredPoint(item)}
+                  onMouseLeave={() => setHoveredPoint(null)}
+                />
+                <circle
+                  cx={loginPoint.x}
+                  cy={loginPoint.y}
+                  r="4"
+                  className="analytics-line-dot analytics-line-dot-logins"
+                  onMouseEnter={() => setHoveredPoint(item)}
+                  onMouseLeave={() => setHoveredPoint(null)}
+                />
+                {showLabel ? (
+                  <text x={viewPoint.x} y={height - 14} textAnchor="middle" className="analytics-axis-text analytics-axis-x">
+                    {formatDayLabel(item.date)}
+                  </text>
+                ) : null}
+              </g>
+            );
+          })}
+        </svg>
+      </div>
+      {hoveredPoint ? (
+        <div className="analytics-user-daily-tooltip">
+          <strong>{formatDayLabel(hoveredPoint.date)}</strong>
+          <span>{formatAccessLabel(hoveredPoint.views || 0)}</span>
+          <span>{formatLoginLabel(hoveredPoint.logins || 0)}</span>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -591,7 +672,7 @@ function UserDetailPanel({ user }) {
               <strong>{formatDateTime(user.lastActivityAt)}</strong>
             </div>
           </div>
-          <UserHourBars user={user} />
+          <UserDailyLineChart user={user} />
         </div>
       </div>
     </article>

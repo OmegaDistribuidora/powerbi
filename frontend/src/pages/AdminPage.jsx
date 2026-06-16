@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "../components/AuthProvider";
 import { apiJson } from "../services/api";
+import { MODULES } from "../modules";
 
 const emptyReport = {
   name: "",
@@ -40,6 +41,7 @@ const emptyUser = {
   role: "USER",
   active: true,
   reportIds: [],
+  moduleAccess: [],
   filterRules: []
 };
 
@@ -855,6 +857,20 @@ export default function AdminPage() {
     });
   }
 
+  function toggleUserModule(moduleKey) {
+    setUserForm((current) => {
+      const currentModules = current.moduleAccess || [];
+      const nextModuleAccess = currentModules.includes(moduleKey)
+        ? currentModules.filter((key) => key !== moduleKey)
+        : [...currentModules, moduleKey];
+
+      return {
+        ...current,
+        moduleAccess: nextModuleAccess
+      };
+    });
+  }
+
   function updateFilterRule(index, patch) {
     setUserForm((current) => ({
       ...current,
@@ -937,6 +953,7 @@ export default function AdminPage() {
       role: user.role,
       active: user.active,
       reportIds: nextReportIds,
+      moduleAccess: user.moduleAccess || [],
       filterRules: nextFilterRules
     });
     setUserModalOpen(true);
@@ -1308,6 +1325,7 @@ export default function AdminPage() {
       return {
         ...form,
         reportIds: [],
+        moduleAccess: [],
         filterRules: []
       };
     }
@@ -1315,6 +1333,7 @@ export default function AdminPage() {
     return {
       ...form,
       reportIds: form.reportIds.filter((reportId) => isAllowedReportId(reportId)),
+      moduleAccess: form.moduleAccess || [],
       filterRules: form.filterRules
         .filter(
           (rule) =>
@@ -2253,7 +2272,24 @@ export default function AdminPage() {
             {userForm.role === "ADMIN" ? (
               <p className="muted small">Usuários administradores não recebem painéis vinculados.</p>
             ) : (
-              <fieldset>
+              <>
+                <fieldset>
+                  <legend>Modulos liberados</legend>
+                  <div className="check-grid">
+                    {MODULES.map((module) => (
+                      <label key={module.key} className="check-row">
+                        <input
+                          type="checkbox"
+                          checked={(userForm.moduleAccess || []).includes(module.key)}
+                          onChange={() => toggleUserModule(module.key)}
+                        />
+                        <span>{module.label}</span>
+                      </label>
+                    ))}
+                  </div>
+                </fieldset>
+
+                <fieldset>
                 <legend>Painéis liberados</legend>
                 <div className="selection-group-grid">
                   {activeReportsGroupedByCategory.map((group) => {
@@ -2290,7 +2326,8 @@ export default function AdminPage() {
                     );
                   })}
                 </div>
-              </fieldset>
+                </fieldset>
+              </>
             )}
 
             <fieldset>

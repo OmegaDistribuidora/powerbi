@@ -2,6 +2,7 @@ import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import prisma from "../lib/prisma";
 import { recordAudit } from "../lib/audit";
+import { MODULE_KEYS, normalizeModuleAccess, serializeModuleAccess, type ModuleKey } from "../lib/modules";
 import { hashPassword, requireAdmin, requireAuth } from "../lib/security";
 import type { AppUserRole } from "../types";
 
@@ -20,6 +21,7 @@ const createUserSchema = z.object({
   role: z.enum(["ADMIN", "USER"]),
   active: z.boolean().default(true),
   reportIds: z.array(z.number().int().positive()).default([]),
+  moduleAccess: z.array(z.enum(MODULE_KEYS)).default([]),
   filterRules: z.array(filterRuleSchema).default([])
 });
 
@@ -93,6 +95,7 @@ function serializeUser(user: {
   active: boolean;
   createdAt: Date;
   reportAccess: Array<{ reportId: number }>;
+  moduleAccesses?: Array<{ module: ModuleKey | string }>;
   filterRules: Array<{
     id: number;
     reportId: number | null;
@@ -110,6 +113,7 @@ function serializeUser(user: {
     active: user.active,
     createdAt: user.createdAt,
     reportIds: user.reportAccess.map((item) => item.reportId),
+    moduleAccess: serializeModuleAccess(user.role, user.moduleAccesses),
     filterRules: user.filterRules
   };
 }
@@ -123,6 +127,7 @@ function userAuditSnapshot(user: ReturnType<typeof serializeUser>) {
     role: user.role,
     active: user.active,
     reportIds: user.reportIds,
+    moduleAccess: user.moduleAccess,
     filterRules: user.filterRules.map((rule) => ({
       id: rule.id,
       reportId: rule.reportId,
@@ -141,6 +146,11 @@ export async function registerUserRoutes(app: FastifyInstance): Promise<void> {
         reportAccess: {
           select: {
             reportId: true
+          }
+        },
+        moduleAccesses: {
+          select: {
+            module: true
           }
         },
         filterRules: {
@@ -167,6 +177,7 @@ export async function registerUserRoutes(app: FastifyInstance): Promise<void> {
     }
 
     const passwordHash = await hashPassword(parsed.data.password);
+    const moduleAccess = parsed.data.role === "ADMIN" ? [] : normalizeModuleAccess(parsed.data.moduleAccess);
 
     const rulesAreValid = await validateFilterRules(parsed.data.reportIds, parsed.data.filterRules, prisma);
     if (!rulesAreValid) {
@@ -182,7 +193,10 @@ export async function registerUserRoutes(app: FastifyInstance): Promise<void> {
           profileLabel: parsed.data.profileLabel?.trim() || null,
           passwordHash,
           role: parsed.data.role,
-          active: parsed.data.active
+          active: parsed.data.active,
+          moduleAccesses: {
+            create: moduleAccess.map((module) => ({ module }))
+          }
         }
       });
 
@@ -212,6 +226,7 @@ export async function registerUserRoutes(app: FastifyInstance): Promise<void> {
         where: { id: user.id },
         include: {
           reportAccess: { select: { reportId: true } },
+          moduleAccesses: { select: { module: true } },
           filterRules: true
         }
       });
@@ -251,6 +266,7 @@ export async function registerUserRoutes(app: FastifyInstance): Promise<void> {
       where: { id: userId },
       include: {
         reportAccess: { select: { reportId: true } },
+        moduleAccesses: { select: { module: true } },
         filterRules: true
       }
     });
@@ -271,6 +287,7 @@ export async function registerUserRoutes(app: FastifyInstance): Promise<void> {
 
     const authUser = request.authUser;
     const beforeSnapshot = userAuditSnapshot(serializeUser(current));
+    const moduleAccess = parsed.data.role === "ADMIN" ? [] : normalizeModuleAccess(parsed.data.moduleAccess);
 
     const updated = await prisma.$transaction(async (tx: any) => {
       await tx.user.update({
@@ -298,6 +315,17 @@ export async function registerUserRoutes(app: FastifyInstance): Promise<void> {
         });
       }
 
+      await tx.userModuleAccess.deleteMany({ where: { userId } });
+      if (moduleAccess.length) {
+        await tx.userModuleAccess.createMany({
+          data: moduleAccess.map((module) => ({
+            userId,
+            module
+          })),
+          skipDuplicates: true
+        });
+      }
+
       await tx.filterRule.deleteMany({ where: { userId } });
       if (parsed.data.filterRules.length) {
         await tx.filterRule.createMany({
@@ -315,6 +343,7 @@ export async function registerUserRoutes(app: FastifyInstance): Promise<void> {
         where: { id: userId },
         include: {
           reportAccess: { select: { reportId: true } },
+          moduleAccesses: { select: { module: true } },
           filterRules: true
         }
       });
@@ -349,6 +378,7 @@ export async function registerUserRoutes(app: FastifyInstance): Promise<void> {
       where: { id: userId },
       include: {
         reportAccess: { select: { reportId: true } },
+        moduleAccesses: { select: { module: true } },
         filterRules: true
       }
     });

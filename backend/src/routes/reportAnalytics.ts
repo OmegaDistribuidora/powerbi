@@ -1,7 +1,8 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import prisma from "../lib/prisma";
-import { requireAdmin, requireAuth } from "../lib/security";
+import { requireModuleAccess } from "../lib/modules";
+import { requireAuth } from "../lib/security";
 
 const FORTALEZA_TZ = "America/Fortaleza";
 const DEFAULT_SESSION_MINUTES = 5;
@@ -70,8 +71,10 @@ type UserStatAccumulator = {
   reportCounts: Map<string, { reportId: string; reportName: string; categoryName: string; accesses: number }>;
   viewHourCounts: number[];
   viewWeekdayCounts: Map<string, number>;
+  viewDayCounts: Map<string, number>;
   loginHourCounts: number[];
   loginWeekdayCounts: Map<string, number>;
+  loginDayCounts: Map<string, number>;
 };
 
 function parseFortalezaDateRange(startDate: string, endDate: string) {
@@ -163,6 +166,32 @@ function estimateSessionDurations(logs: AuditLogRef[]) {
   return { reportDurations, userDurations };
 }
 
+function formatFortalezaDateKey(date: Date) {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: FORTALEZA_TZ,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit"
+  }).formatToParts(date);
+  const year = parts.find((part) => part.type === "year")?.value || "0000";
+  const month = parts.find((part) => part.type === "month")?.value || "00";
+  const day = parts.find((part) => part.type === "day")?.value || "00";
+
+  return `${year}-${month}-${day}`;
+}
+
+function buildDateKeys(startDate: string, endDate: string) {
+  const keys: string[] = [];
+  const start = new Date(`${startDate}T00:00:00-03:00`);
+  const end = new Date(`${endDate}T00:00:00-03:00`);
+
+  for (let current = start; current <= end; current = new Date(current.getTime() + 24 * 60 * 60 * 1000)) {
+    keys.push(formatFortalezaDateKey(current));
+  }
+
+  return keys;
+}
+
 function average(values: number[]) {
   if (!values.length) {
     return null;
@@ -175,7 +204,7 @@ function sortBreakdown(entries: Map<number, AccessBreakdown>) {
   return Array.from(entries.values()).sort((a, b) => b.accesses - a.accesses || a.displayName.localeCompare(b.displayName));
 }
 
-function ensureUserAccumulator(userStatsMap: Map<number, UserStatAccumulator>, activeUser: ActiveUserRef) {
+function ensureUserAccumulator(userStatsMap: Map<number, UserStatAccumulator>, activeUser: ActiveUserRef, dateKeys: string[]) {
   if (!userStatsMap.has(activeUser.id)) {
     userStatsMap.set(activeUser.id, {
       userId: activeUser.id,
@@ -191,8 +220,10 @@ function ensureUserAccumulator(userStatsMap: Map<number, UserStatAccumulator>, a
       reportCounts: new Map(),
       viewHourCounts: Array.from({ length: 24 }, () => 0),
       viewWeekdayCounts: new Map(WEEKDAY_SEED.map((label) => [normalizeWeekday(label), 0])),
+      viewDayCounts: new Map(dateKeys.map((date) => [date, 0])),
       loginHourCounts: Array.from({ length: 24 }, () => 0),
-      loginWeekdayCounts: new Map(WEEKDAY_SEED.map((label) => [normalizeWeekday(label), 0]))
+      loginWeekdayCounts: new Map(WEEKDAY_SEED.map((label) => [normalizeWeekday(label), 0])),
+      loginDayCounts: new Map(dateKeys.map((date) => [date, 0]))
     });
   }
 
@@ -250,7 +281,7 @@ function findPeakWeekday(counts: Map<string, number>) {
 }
 
 export async function registerReportAnalyticsRoutes(app: FastifyInstance): Promise<void> {
-  app.get("/api/report-analytics", { preHandler: [requireAuth, requireAdmin] }, async (request, reply) => {
+  app.get("/api/report-analytics", { preHandler: [requireAuth, requireModuleAccess("REPORTS_ANALYTICS")] }, async (request, reply) => {
     let parsed;
 
     try {
@@ -348,6 +379,7 @@ export async function registerReportAnalyticsRoutes(app: FastifyInstance): Promi
     const reportMap = new Map<number, ReportRef>(reports.map((report) => [report.id, report]));
     const activeUserById = new Map(activeUsers.map((user) => [user.id, user]));
     const activeUserByUsername = new Map(activeUsers.map((user) => [user.username, user]));
+    const dateKeys = buildDateKeys(parsed.startDate, parsed.endDate);
 
     const reportRankingMap = new Map<string, { reportId: string; reportName: string; accesses: number }>();
     const categoryMap = new Map<string, { categoryName: string; accesses: number }>();
@@ -388,11 +420,13 @@ export async function registerReportAnalyticsRoutes(app: FastifyInstance): Promi
         return;
       }
 
-      const userStats = ensureUserAccumulator(userStatsMap, activeUser);
+      const userStats = ensureUserAccumulator(userStatsMap, activeUser, dateKeys);
       userStats.totalViews += 1;
       trackActivityWindow(userStats, log.createdAt, "view");
       userStats.viewHourCounts[hour] += 1;
       userStats.viewWeekdayCounts.set(weekday, (userStats.viewWeekdayCounts.get(weekday) || 0) + 1);
+      const dateKey = formatFortalezaDateKey(log.createdAt);
+      userStats.viewDayCounts.set(dateKey, (userStats.viewDayCounts.get(dateKey) || 0) + 1);
 
       trackBreakdown(viewHourUsers[hour], activeUser);
       const weekdayUsers = viewWeekdayUsers.get(weekday);
@@ -422,11 +456,13 @@ export async function registerReportAnalyticsRoutes(app: FastifyInstance): Promi
         return;
       }
 
-      const userStats = ensureUserAccumulator(userStatsMap, activeUser);
+      const userStats = ensureUserAccumulator(userStatsMap, activeUser, dateKeys);
       userStats.totalLogins += 1;
       trackActivityWindow(userStats, log.createdAt, "login");
       userStats.loginHourCounts[hour] += 1;
       userStats.loginWeekdayCounts.set(weekday, (userStats.loginWeekdayCounts.get(weekday) || 0) + 1);
+      const dateKey = formatFortalezaDateKey(log.createdAt);
+      userStats.loginDayCounts.set(dateKey, (userStats.loginDayCounts.get(dateKey) || 0) + 1);
 
       trackBreakdown(loginHourUsers[hour], activeUser);
       const weekdayUsers = loginWeekdayUsers.get(weekday);
@@ -436,7 +472,7 @@ export async function registerReportAnalyticsRoutes(app: FastifyInstance): Promi
     });
 
     activeUsers.forEach((activeUser) => {
-      ensureUserAccumulator(userStatsMap, activeUser);
+      ensureUserAccumulator(userStatsMap, activeUser, dateKeys);
     });
 
     const reportRanking = Array.from(reportRankingMap.values())
@@ -503,6 +539,11 @@ export async function registerReportAnalyticsRoutes(app: FastifyInstance): Promi
           peakLoginWeekdayAccesses: peakLoginWeekday.accesses,
           uniqueReports: user.reportCounts.size,
           reportBreakdown,
+          activityByDay: dateKeys.map((date) => ({
+            date,
+            views: user.viewDayCounts.get(date) || 0,
+            logins: user.loginDayCounts.get(date) || 0
+          })),
           viewHours: user.viewHourCounts.map((accesses, hour) => ({ hour, accesses })),
           loginHours: user.loginHourCounts.map((logins, hour) => ({ hour, logins })),
           viewWeekdays: Array.from(user.viewWeekdayCounts.entries()).map(([weekday, accesses]) => ({ weekday, accesses })),

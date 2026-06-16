@@ -1,7 +1,8 @@
 ﻿import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import prisma from "../lib/prisma";
-import { requireAdmin, requireAuth } from "../lib/security";
+import { requireModuleAccess } from "../lib/modules";
+import { requireAuth } from "../lib/security";
 
 const auditQuerySchema = z.object({
   kind: z.enum(["logins", "actions"]).default("actions"),
@@ -26,7 +27,7 @@ function buildPeriodWhere(period: "today" | "week") {
 }
 
 export async function registerAuditRoutes(app: FastifyInstance): Promise<void> {
-  app.get("/api/audit", { preHandler: [requireAuth, requireAdmin] }, async (request) => {
+  app.get("/api/audit", { preHandler: [requireAuth, requireModuleAccess("AUDIT")] }, async (request) => {
     const query = auditQuerySchema.parse(request.query ?? {});
     const where = {
       createdAt: buildPeriodWhere(query.period),

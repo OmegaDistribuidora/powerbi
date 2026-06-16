@@ -1913,49 +1913,72 @@ label {
   min-width: 0;
 }
 
-.analytics-user-hour-chart {
-  display: grid;
-  grid-template-columns: repeat(24, minmax(10px, 1fr));
-  gap: 4px;
-  align-items: end;
-  min-height: 124px;
-  padding-top: 8px;
-}
-
-.analytics-user-hour-column {
-  display: grid;
-  gap: 5px;
-  justify-items: center;
-  color: var(--muted);
-  font-size: 0.68rem;
-}
-
-.analytics-user-hour-bar {
+.analytics-user-daily-card {
   position: relative;
-  display: flex;
-  align-items: end;
-  justify-content: center;
-  gap: 1px;
-  width: 100%;
-  height: 88px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.06);
-  overflow: hidden;
+  display: grid;
+  gap: 8px;
+  padding-top: 4px;
 }
 
-.analytics-user-hour-fill {
+.analytics-user-daily-scroll {
+  overflow-x: auto;
+  overflow-y: visible;
+}
+
+.analytics-user-daily-chart {
   display: block;
-  width: 42%;
-  min-height: 0;
-  border-radius: 999px 999px 0 0;
+  height: 190px;
+  transition: height 0.2s ease;
 }
 
-.analytics-user-hour-fill-view {
-  background: rgba(255, 123, 44, 0.9);
+.analytics-user-daily-card:hover .analytics-user-daily-chart,
+.analytics-user-daily-card:focus-within .analytics-user-daily-chart {
+  height: 270px;
 }
 
-.analytics-user-hour-fill-login {
-  background: rgba(108, 163, 255, 0.9);
+.analytics-line {
+  fill: none;
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.analytics-line-views {
+  stroke: rgba(255, 123, 44, 0.95);
+}
+
+.analytics-line-logins {
+  stroke: rgba(108, 163, 255, 0.95);
+}
+
+.analytics-line-dot {
+  stroke: rgba(8, 18, 37, 0.95);
+  stroke-width: 2;
+}
+
+.analytics-line-dot-views {
+  fill: rgba(255, 123, 44, 0.95);
+}
+
+.analytics-line-dot-logins {
+  fill: rgba(108, 163, 255, 0.95);
+}
+
+.analytics-user-daily-tooltip {
+  position: absolute;
+  right: 8px;
+  top: 34px;
+  z-index: 4;
+  display: grid;
+  gap: 3px;
+  min-width: 148px;
+  padding: 9px 10px;
+  border-radius: 12px;
+  border: 1px solid rgba(133, 167, 255, 0.18);
+  background: rgba(7, 18, 38, 0.94);
+  box-shadow: 0 14px 30px rgba(0, 0, 0, 0.32);
+  color: var(--text);
+  font-size: 0.82rem;
 }
 
 .analytics-user-list {
@@ -2196,12 +2219,6 @@ code {
   .analytics-active-user-score {
     grid-column: 2;
     justify-items: start;
-  }
-
-  .analytics-user-hour-chart {
-    overflow-x: auto;
-    grid-template-columns: repeat(24, 22px);
-    padding-bottom: 4px;
   }
 
   .analytics-chart {

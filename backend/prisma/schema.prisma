@@ -16,6 +16,12 @@ enum FilterOperator {
   EQUALS
 }
 
+enum AppModule {
+  REPORTS_ANALYTICS
+  MAPPING
+  AUDIT
+}
+
 model User {
   id            Int                @id @default(autoincrement())
   username      String             @unique
@@ -26,6 +32,7 @@ model User {
   active        Boolean            @default(true)
   reportAccess  UserReportAccess[]
   homeCardAccesses HomeCardAccess[]
+  moduleAccesses UserModuleAccess[]
   filterRules   FilterRule[]
   auditLogs     AuditLog[]
   createdAt     DateTime           @default(now())
@@ -107,6 +114,16 @@ model UserReportAccess {
 
   @@id([userId, reportId])
   @@index([reportId])
+}
+
+model UserModuleAccess {
+  userId    Int
+  module    AppModule
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@id([userId, module])
+  @@index([module])
 }
 
 model FilterRule {
