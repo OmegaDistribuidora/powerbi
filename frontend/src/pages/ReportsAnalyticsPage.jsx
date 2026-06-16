@@ -699,7 +699,7 @@ function UserReportBreakdown({ user, selectedReportId, onSelectReport }) {
   return (
     <div className="analytics-user-report-list">
       {items.length ? (
-        items.slice(0, 8).map((item, index) => (
+        items.map((item, index) => (
           <button
             key={item.reportId}
             type="button"
