@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  Activity, AppWindow, BarChart3, CalendarDays, ChevronDown, ChevronRight, Clock3,
+  Activity, AppWindow, ArrowLeft, BarChart3, CalendarDays, ChevronDown, ChevronRight, Clock3,
   Filter, LayoutDashboard, LoaderCircle, LogIn, RefreshCw, Search, ShieldCheck, Users, X
 } from "lucide-react";
+import { Link } from "react-router-dom";
 import { useAuth } from "../components/AuthProvider";
 import { apiJson } from "../services/api";
 import {
@@ -30,6 +31,7 @@ export default function GestaoVendasReportsPage() {
   if (!entered) {
     return (
       <div className="gv-welcome">
+        <Link className="gv-welcome-back" to="/"><ArrowLeft size={17} /> Voltar ao Power BI</Link>
         <section className="gv-welcome-brand">
           <img src="/gestao-vendas-logo.png" alt="Gestão de Vendas" />
           <span>Inteligência de uso</span>
@@ -47,10 +49,10 @@ export default function GestaoVendasReportsPage() {
       </div>
     );
   }
-  return <ReportsDashboard token={token} />;
+  return <ReportsDashboard token={token} user={user} />;
 }
 
-function ReportsDashboard({ token }) {
+function ReportsDashboard({ token, user }) {
   const initialRange = rangeForPreset("today");
   const [tab, setTab] = useState("overview");
   const [period, setPeriod] = useState("today");
@@ -113,22 +115,30 @@ function ReportsDashboard({ token }) {
 
   return (
     <div className="gv-reports">
-      <header className="gv-header">
-        <div><span>PAINEL ADMINISTRATIVO</span><h1>Relatórios - Gestão de Vendas</h1></div>
-        <div>{lastUpdated && <small>Atualizado {lastUpdated.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}</small>}<button onClick={() => Promise.all([loadUsers(), loadReport()])} disabled={loading}><RefreshCw className={loading ? "gv-spin" : ""} size={17} /> Atualizar</button></div>
-      </header>
-      <nav className="gv-tabs">{TABS.map((item) => { const Icon = item.icon; return <button key={item.id} className={tab === item.id ? "active" : ""} onClick={() => setTab(item.id)}><Icon size={18} /> {item.label}</button>; })}</nav>
-      <FilterPanel {...{ period, startDate, endDate, users, selectedUser, coordinators, selectedCoordinator, coordinatorEnabled, availableProfiles, selectedProfiles, activeFilters, choosePeriod, chooseCoordinator, toggleProfile }} setStartDate={(value) => { setPeriod("custom"); setStartDate(value); }} setEndDate={(value) => { setPeriod("custom"); setEndDate(value); }} setSelectedUserId={setSelectedUserId} clearFilters={() => { setSelectedUserId(""); setSelectedCoordinator(""); setSelectedProfiles([]); }} />
-      <div className="gv-period"><CalendarDays size={16} /> Dados de <strong>{formatDateKey(startDate)}</strong> até <strong>{formatDateKey(endDate)}</strong><span>· Horário de Brasília (UTC-3)</span></div>
-      {error && <div className="gv-error">{error}</div>}
-      <div className={`gv-report-area ${loading ? "loading" : ""}`}>
-        {tab === "overview" && <Overview report={report} />}
-        {tab === "users" && <UsersView report={report} />}
-        {tab === "modules" && <ModulesView report={report} />}
-        {tab === "hours" && <HoursView report={report} />}
-        {tab === "weekdays" && <WeekdaysView report={report} />}
-        {loading && <div className="gv-loading"><LoaderCircle className="gv-spin" size={27} /> Atualizando relatório...</div>}
-      </div>
+      <aside className="gv-sidebar">
+        <div className="gv-brand"><img src="/gestao-vendas-logo.png" alt="" /><div><strong>Gestão de Vendas</strong><span>Relatórios de uso</span></div></div>
+        <nav>{TABS.map((item) => { const Icon = item.icon; return <button key={item.id} className={tab === item.id ? "active" : ""} onClick={() => setTab(item.id)}><Icon size={19} /> {item.label}</button>; })}</nav>
+        <footer><div className="gv-sidebar-user"><Avatar label={user?.displayName || user?.username} /><span><strong>{user?.displayName || user?.username}</strong><small>{user?.profileLabel || (user?.role === "ADMIN" ? "Administrador" : "Usuário")}</small></span></div><Link to="/"><ArrowLeft size={17} /> Voltar ao Power BI</Link></footer>
+      </aside>
+      <main className="gv-workspace">
+        <header className="gv-header">
+          <div><span>PAINEL ADMINISTRATIVO</span><h1>{TABS.find((item) => item.id === tab)?.label}</h1></div>
+          <div>{lastUpdated && <small>Atualizado {lastUpdated.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}</small>}<button onClick={() => Promise.all([loadUsers(), loadReport()])} disabled={loading}><RefreshCw className={loading ? "gv-spin" : ""} size={17} /> Atualizar</button></div>
+        </header>
+        <section className="gv-dashboard-content">
+          <FilterPanel {...{ period, startDate, endDate, users, selectedUser, coordinators, selectedCoordinator, coordinatorEnabled, availableProfiles, selectedProfiles, activeFilters, choosePeriod, chooseCoordinator, toggleProfile }} setStartDate={(value) => { setPeriod("custom"); setStartDate(value); }} setEndDate={(value) => { setPeriod("custom"); setEndDate(value); }} setSelectedUserId={setSelectedUserId} clearFilters={() => { setSelectedUserId(""); setSelectedCoordinator(""); setSelectedProfiles([]); }} />
+          <div className="gv-period"><CalendarDays size={16} /> Dados de <strong>{formatDateKey(startDate)}</strong> até <strong>{formatDateKey(endDate)}</strong><span>· Horário de Brasília (UTC-3)</span></div>
+          {error && <div className="gv-error">{error}</div>}
+          <div className={`gv-report-area ${loading ? "loading" : ""}`}>
+            {tab === "overview" && <Overview report={report} />}
+            {tab === "users" && <UsersView report={report} />}
+            {tab === "modules" && <ModulesView report={report} />}
+            {tab === "hours" && <HoursView report={report} />}
+            {tab === "weekdays" && <WeekdaysView report={report} />}
+            {loading && <div className="gv-loading"><LoaderCircle className="gv-spin" size={27} /> Atualizando relatório...</div>}
+          </div>
+        </section>
+      </main>
     </div>
   );
 }

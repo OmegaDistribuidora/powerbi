@@ -303,6 +303,17 @@ label {
   padding: 14px;
 }
 
+.app-shell-focus {
+  display: block;
+  min-height: 100vh;
+  background: #f4f7fb;
+}
+
+.content-focus {
+  min-height: 100vh;
+  padding: 0;
+}
+
 .page-stack {
   display: grid;
   gap: 18px;

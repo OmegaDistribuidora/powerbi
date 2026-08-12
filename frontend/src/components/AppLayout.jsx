@@ -1,5 +1,5 @@
 ﻿import { useEffect, useMemo, useState } from "react";
-import { NavLink, Outlet, useNavigate } from "react-router-dom";
+import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "./AuthProvider";
 import { apiJson } from "../services/api";
 import { MODULES, hasModuleAccess } from "../modules";
@@ -123,6 +123,8 @@ function PasswordModal({ onClose, onSubmit, saving, error, success, isAdmin, use
 export default function AppLayout() {
   const { token, user, logout } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  const focusedModule = location.pathname.startsWith("/gestao-vendas-reports");
   const [reports, setReports] = useState([]);
   const [categories, setCategories] = useState([]);
   const [adminUsers, setAdminUsers] = useState([]);
@@ -268,8 +270,8 @@ export default function AppLayout() {
   }
 
   return (
-    <div className="app-shell">
-      <aside className="sidebar">
+    <div className={focusedModule ? "app-shell app-shell-focus" : "app-shell"}>
+      {!focusedModule ? <aside className="sidebar">
         <div>
           <NavLink to="/" className="brand brand-link">
             <span className="brand-mark">
@@ -328,9 +330,9 @@ export default function AppLayout() {
             Sair
           </button>
         </div>
-      </aside>
+      </aside> : null}
 
-      <main className="content">
+      <main className={focusedModule ? "content content-focus" : "content"}>
         <Outlet />
       </main>
 
