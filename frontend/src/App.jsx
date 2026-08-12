@@ -10,6 +10,7 @@ import ReportViewPage from "./pages/ReportViewPage";
 import AuditPage from "./pages/AuditPage";
 import MappingPage from "./pages/MappingPage";
 import ReportsAnalyticsPage from "./pages/ReportsAnalyticsPage";
+import GestaoVendasReportsPage from "./pages/GestaoVendasReportsPage";
 
 export default function App() {
   return (
@@ -54,6 +55,14 @@ export default function App() {
           element={
             <ModuleRoute moduleKey="REPORTS_ANALYTICS">
               <ReportsAnalyticsPage />
+            </ModuleRoute>
+          }
+        />
+        <Route
+          path="gestao-vendas-reports"
+          element={
+            <ModuleRoute moduleKey="GESTAO_VENDAS_REPORTS">
+              <GestaoVendasReportsPage />
             </ModuleRoute>
           }
         />

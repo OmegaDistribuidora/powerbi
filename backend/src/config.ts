@@ -94,5 +94,13 @@ export const env = {
     audience: String(process.env.ECOSYSTEM_SSO_AUDIENCE || "powerbi").trim(),
     sharedSecret: String(process.env.ECOSYSTEM_SSO_SHARED_SECRET || "").trim(),
     adminUsers: parseNormalizedList(process.env.ECOSYSTEM_SSO_ADMIN_USERS)
+  },
+  gestaoVendasReports: {
+    supabaseUrl: String(process.env.GESTAO_VENDAS_SUPABASE_URL || "").trim(),
+    publishableKey: String(process.env.GESTAO_VENDAS_SUPABASE_PUBLISHABLE_KEY || "").trim(),
+    serviceRoleKey: String(process.env.GESTAO_VENDAS_SUPABASE_SERVICE_ROLE_KEY || "").trim(),
+    adminEmail: String(
+      process.env.GESTAO_VENDAS_SUPABASE_ADMIN_EMAIL || "admin@app.omegadistribuidora.com.br"
+    ).trim()
   }
 };

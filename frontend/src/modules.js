@@ -10,6 +10,11 @@ export const MODULES = [
     path: "/reports-analytics"
   },
   {
+    key: "GESTAO_VENDAS_REPORTS",
+    label: "Relatórios - Gestão de Vendas",
+    path: "/gestao-vendas-reports"
+  },
+  {
     key: "AUDIT",
     label: "Auditoria",
     path: "/audit"

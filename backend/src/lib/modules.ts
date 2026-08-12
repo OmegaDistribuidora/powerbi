@@ -1,12 +1,13 @@
 import type { FastifyReply, FastifyRequest } from "fastify";
 import prisma from "./prisma";
 
-export const MODULE_KEYS = ["REPORTS_ANALYTICS", "MAPPING", "AUDIT"] as const;
+export const MODULE_KEYS = ["REPORTS_ANALYTICS", "GESTAO_VENDAS_REPORTS", "MAPPING", "AUDIT"] as const;
 
 export type ModuleKey = (typeof MODULE_KEYS)[number];
 
 export const MODULE_LABELS: Record<ModuleKey, string> = {
   REPORTS_ANALYTICS: "Relatorios",
+  GESTAO_VENDAS_REPORTS: "Relatorios - Gestao de Vendas",
   MAPPING: "Mapeamento de paineis",
   AUDIT: "Auditoria"
 };

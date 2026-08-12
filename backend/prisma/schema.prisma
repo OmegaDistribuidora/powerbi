@@ -18,6 +18,7 @@ enum FilterOperator {
 
 enum AppModule {
   REPORTS_ANALYTICS
+  GESTAO_VENDAS_REPORTS
   MAPPING
   AUDIT
 }

@@ -9,6 +9,7 @@ Sistema interno para gerenciar acesso a paineis do Power BI por usuario, com:
 - vinculo usuario -> paineis
 - regras de filtro dinamicas por usuario
 - cards customizaveis na pagina inicial
+- relatorios de uso do aplicativo Gestao de Vendas, protegidos pelo mesmo SSO e por permissao de modulo
 
 ## Stack
 
@@ -82,6 +83,23 @@ Se o usuario local alvo for `ADMIN`, o backend exigira:
 - e que o login do Ecossistema esteja nessa allowlist ou seja igual ao `targetLogin`
 
 Tambem e recomendado rotacionar periodicamente `ADMIN_PASSWORD`, `JWT_SECRET` e `ECOSYSTEM_SSO_SHARED_SECRET`.
+
+## Relatorios - Gestao de Vendas
+
+O modulo `GESTAO_VENDAS_REPORTS` incorpora ao Power BI Hub as mesmas visoes administrativas de uso do aplicativo: visao geral, usuarios, modulos, horarios e dias. O usuario entra normalmente pelo SSO do Ecossistema e, se tiver permissao para o modulo, apenas confirma a entrada antes de abrir o painel. Nao existe um segundo login do Supabase no navegador.
+
+O administrador concede a permissao em **Administracao > Usuarios > Modulos do sistema**, marcando **Relatorios - Gestao de Vendas**. Contas `ADMIN` continuam com acesso automatico a todos os modulos.
+
+Configure somente no backend/Railway:
+
+```bash
+GESTAO_VENDAS_SUPABASE_URL=https://seu-projeto.supabase.co
+GESTAO_VENDAS_SUPABASE_PUBLISHABLE_KEY=<chave publicavel>
+GESTAO_VENDAS_SUPABASE_SERVICE_ROLE_KEY=<chave legacy service_role>
+GESTAO_VENDAS_SUPABASE_ADMIN_EMAIL=admin@app.omegadistribuidora.com.br
+```
+
+A chave `service_role` permanece exclusivamente no servidor. As rotas `/api/gestao-vendas-reports/*` exigem a sessao do Power BI Hub e a permissao `GESTAO_VENDAS_REPORTS`; o frontend nunca recebe credenciais administrativas do Supabase.
 
 ## Variaveis do frontend para Power BI Pro
 

@@ -16,6 +16,7 @@ import { registerReportCategoryRoutes } from "./routes/reportCategories";
 import { registerHomeCardRoutes } from "./routes/homeCards";
 import { registerReportAnalyticsRoutes } from "./routes/reportAnalytics";
 import { registerModuleDataRoutes } from "./routes/moduleData";
+import { registerGestaoVendasReportRoutes } from "./routes/gestaoVendasReports";
 import type { AuthUser } from "./types";
 
 declare module "fastify" {
@@ -58,6 +59,7 @@ async function bootstrap(): Promise<void> {
   await registerDashboardRoutes(app);
   await registerModuleDataRoutes(app);
   await registerReportAnalyticsRoutes(app);
+  await registerGestaoVendasReportRoutes(app);
   await registerAuditRoutes(app);
 
   if (env.previewsDir) {
