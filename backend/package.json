@@ -5,6 +5,7 @@
   "scripts": {
     "postinstall": "prisma generate",
     "dev": "tsx watch src/server.ts",
+    "test": "tsx --test src/routes/users.test.ts",
     "build": "prisma generate && tsc -p tsconfig.json",
     "start": "prisma db push --skip-generate && node dist/server.js",
     "prisma:generate": "prisma generate",

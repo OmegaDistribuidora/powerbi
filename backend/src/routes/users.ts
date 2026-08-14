@@ -25,8 +25,9 @@ const createUserSchema = z.object({
   filterRules: z.array(filterRuleSchema).default([])
 });
 
-const updateUserSchema = createUserSchema.extend({
-  password: z.string().min(3).optional().or(z.literal(""))
+export const updateUserSchema = createUserSchema.extend({
+  password: z.string().min(3).optional().or(z.literal("")),
+  moduleAccess: z.array(z.enum(MODULE_KEYS))
 });
 
 function normalizeUsername(value: string): string {

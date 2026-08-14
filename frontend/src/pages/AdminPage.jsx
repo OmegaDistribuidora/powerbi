@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "../components/AuthProvider";
 import { apiJson } from "../services/api";
 import { MODULES } from "../modules";
+import { buildUserPayload as buildUserPayloadData } from "../lib/userPayload";
 
 const emptyReport = {
   name: "",
@@ -1294,6 +1295,7 @@ export default function AdminPage() {
               role: user.role,
               active: user.active,
               reportIds: nextReportIds,
+              moduleAccess: user.moduleAccess || [],
               filterRules: nextFilterRules
             },
             {
@@ -1318,37 +1320,7 @@ export default function AdminPage() {
   }
 
   function buildUserPayload(form, options = {}) {
-    const extraAllowedReportIds = new Set((options.extraAllowedReportIds || []).map(Number));
-    const isAllowedReportId = (reportId) => activeReportIds.has(reportId) || extraAllowedReportIds.has(reportId);
-
-    if (form.role === "ADMIN") {
-      return {
-        ...form,
-        reportIds: [],
-        moduleAccess: [],
-        filterRules: []
-      };
-    }
-
-    return {
-      ...form,
-      reportIds: form.reportIds.filter((reportId) => isAllowedReportId(reportId)),
-      moduleAccess: form.moduleAccess || [],
-      filterRules: form.filterRules
-        .filter(
-          (rule) =>
-            rule.tableName &&
-            rule.columnName &&
-            rule.value &&
-            (rule.reportId == null || isAllowedReportId(Number(rule.reportId)))
-        )
-        .map((rule) => ({
-          reportId: rule.reportId ? Number(rule.reportId) : null,
-          tableName: rule.tableName,
-          columnName: rule.columnName,
-          value: rule.value
-        }))
-    };
+    return buildUserPayloadData(form, { ...options, activeReportIds });
   }
 
   async function toggleReportActive(report) {
@@ -1404,6 +1376,7 @@ export default function AdminPage() {
           role: user.role,
           active: !user.active,
           reportIds: user.reportIds || [],
+          moduleAccess: user.moduleAccess || [],
           filterRules: (user.filterRules || []).map((rule) => ({
             reportId: rule.reportId ?? null,
             tableName: rule.tableName,
